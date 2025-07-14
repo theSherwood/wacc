@@ -7,7 +7,6 @@ Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it 
 # Build Commands
 
 - `make` - Build the compiler
-- `make test` - Build and test with test_simple.c
 - `make clean` - Clean build artifacts
 - `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wat)
 
@@ -24,3 +23,4 @@ Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it 
 - Use arenas for memory management.
 - Use data-oriented design for fast code with good cache locality.
 - Follow the philosophy of Mike Acton, Casey Muratori, and Ryan Fleury.
+- Avoid the standard library
