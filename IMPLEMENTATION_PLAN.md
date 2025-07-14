@@ -10,8 +10,6 @@ Also refer to https://github.com/kign/c4wa, which implements a C compiler in Jav
 
 Each step of the compiler will take an arena as its first argument. All allocations are to be made into the arena.
 
-At each stage of development, we will test extensively to ensure that the changes we make are correct for both 32-bit and 64-bit WASM.
-
 ## Compiler Phases
 
 1. **Lexical Analysis (Tokenization)**
@@ -53,6 +51,138 @@ At each stage of development, we will test extensively to ensure that the change
    - Generate both binary WASM (.wasm) and text format (.wat)
    - Create module metadata
    - Handle external function declarations
+
+## Testing
+
+At each stage of development, we will test extensively to ensure that the changes we make are correct for both 32-bit and 64-bit WASM.
+
+Tests are in `./tests/` directory. There are subdirectories.
+
+### `valid` and `invalid` directories
+
+These tests cover compile-time behavior, but do not cover run-time behavior. All parser tests will consist of a code file in C. `valid` tests must parse successfully. `invalid` tests must fail to parse. `invalid` tests will include comments at the end of the file that specify the line numbers and error codes of the compiler errors. If the comments with the line numbers and error codes are missing from a test, they must be added to the test.
+
+## Error Handling Strategy
+
+The compiler implements a comprehensive error collection and reporting system that continues compilation through multiple errors to provide maximum feedback to the user in a single compilation pass.
+
+### Core Principles
+
+1. **Error Collection**: Each compiler phase collects all errors encountered rather than stopping at the first error
+2. **Continuation**: The compiler attempts to continue compilation even after encountering errors
+3. **Context Preservation**: Errors include detailed source location and context information
+4. **User-Friendly Messages**: Error messages are clear, actionable, and include suggested fixes when possible
+
+### Error Categories
+
+1. **Lexical Errors**
+
+   - Invalid character sequences
+   - Malformed literals (strings, numbers)
+   - Unterminated comments or strings
+   - Invalid escape sequences
+
+2. **Syntax Errors**
+
+   - Missing tokens (semicolons, braces, parentheses)
+   - Unexpected tokens
+   - Malformed expressions or statements
+   - Invalid grammar productions
+
+3. **Semantic Errors**
+
+   - Type mismatches
+   - Undefined variables or functions
+   - Redefinition errors
+   - Invalid operations (e.g., assignment to const)
+   - Scope violations
+
+4. **Code Generation Errors**
+   - WASM instruction limits exceeded
+   - Invalid memory access patterns
+   - Unsupported operations for target architecture
+
+### Error Recovery Mechanisms
+
+#### Lexer Recovery
+
+- Skip invalid characters and continue tokenization
+- Use synchronization tokens (semicolons, braces) to resume parsing
+- Maintain accurate line/column tracking even after errors
+
+#### Parser Recovery
+
+- **Panic Mode**: On syntax error, skip tokens until reaching a synchronization point
+- **Synchronization Points**: Statement boundaries (`{`, `}`, `;`), function boundaries
+- **Error Productions**: Add grammar rules for common syntax errors to provide better messages
+- **Minimum Distance Recovery**: Choose recovery strategy that minimizes token skipping
+
+#### Semantic Recovery
+
+- Insert placeholder symbols for undefined identifiers
+- Use error types for type-checking continuation
+- Maintain symbol table consistency even with errors
+
+### Error Reporting Structure
+
+```c
+typedef struct {
+    const char* filename;
+    int line;
+    int column;
+    int start_pos;
+    int end_pos;
+} SourceLocation;
+
+typedef enum {
+    ERROR_LEXICAL,
+    ERROR_SYNTAX,
+    ERROR_SEMANTIC,
+    ERROR_CODEGEN,
+    WARNING
+} ErrorLevel;
+
+typedef struct {
+    ErrorLevel level;
+    SourceLocation location;
+    const char* message;
+    const char* suggestion;  // Optional fix suggestion
+    const char* context;     // Relevant source line
+} CompilerError;
+
+typedef struct {
+    CompilerError* errors;
+    size_t count;
+    size_t capacity;
+    bool has_fatal_errors;
+} ErrorList;
+```
+
+### Error Reporting Format
+
+```
+filename.c:line:column: error: message
+   source code line
+   ^^^^^^^^^^^
+note: suggestion (if available)
+```
+
+### Implementation Guidelines
+
+1. **Early Error Detection**: Catch errors as early as possible in the pipeline
+2. **Error Limits**: Stop compilation after a reasonable number of errors (e.g., 100) to prevent overwhelming output
+3. **Warning System**: Distinguish between errors (compilation stops) and warnings (compilation continues)
+4. **IDE Integration**: Provide structured error output suitable for editor integration
+5. **Color Coding**: Use ANSI color codes for terminal output when supported
+
+### Testing Error Handling
+
+Each compiler phase includes negative test cases that verify:
+
+- Proper error detection and reporting
+- Continued compilation after errors
+- Accurate error location reporting
+- Recovery mechanism effectiveness
 
 ## Implementation Steps
 
