@@ -7,9 +7,20 @@
 
 // Memory management
 typedef struct Arena Arena;
-Arena* arena_init(size_t size);
+Arena* arena_init();
 void arena_free(Arena* arena);
 void* arena_alloc(Arena* arena, size_t size);
+
+// Utility functions (stdlib replacements)
+bool is_space(char c);
+bool is_alpha(char c);
+bool is_digit(char c);
+bool is_alnum(char c);
+size_t str_len(const char* str);
+int str_ncmp(const char* s1, const char* s2, size_t n);
+void str_ncpy(char* dest, const char* src, size_t n);
+void mem_cpy(void* dest, const void* src, size_t n);
+long str_to_long(const char* str, char** endptr, int base);
 
 // Token types
 typedef enum {
@@ -78,84 +89,85 @@ Parser* parser_create(Arena* arena, Lexer* lexer);
 ASTNode* parser_parse_program(Parser* parser);
 
 // IR types
-typedef enum {
-    WASM_I32,
-    WASM_I64,
-    WASM_F32,
-    WASM_F64,
-    WASM_FUNCREF,
-    WASM_EXTERNREF
-} WASMType;
+typedef enum { WASM_I32, WASM_I64, WASM_F32, WASM_F64, WASM_FUNCREF, WASM_EXTERNREF } WASMType;
 
 typedef enum {
-    TYPE_VOID,
-    TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64,
-    TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64,
-    TYPE_F32, TYPE_F64,
-    TYPE_POINTER,
-    TYPE_ARRAY,
-    TYPE_STRUCT,
-    TYPE_FUNCTION
+  TYPE_VOID,
+  TYPE_I8,
+  TYPE_I16,
+  TYPE_I32,
+  TYPE_I64,
+  TYPE_U8,
+  TYPE_U16,
+  TYPE_U32,
+  TYPE_U64,
+  TYPE_F32,
+  TYPE_F64,
+  TYPE_POINTER,
+  TYPE_ARRAY,
+  TYPE_STRUCT,
+  TYPE_FUNCTION
 } TypeKind;
 
 typedef struct Type {
-    TypeKind kind;
-    WASMType wasm_type;
-    size_t size;
-    size_t alignment;
+  TypeKind kind;
+  WASMType wasm_type;
+  size_t size;
+  size_t alignment;
 } Type;
 
 typedef enum {
-    // Constants
-    IR_CONST_INT,
-    // Control Flow
-    IR_RETURN,
-    // Arithmetic
-    IR_ADD, IR_SUB, IR_MUL, IR_DIV,
-    // Memory
-    IR_LOAD_LOCAL, IR_STORE_LOCAL,
-    // Stack operations
-    IR_PUSH, IR_POP
+  // Constants
+  IR_CONST_INT,
+  // Control Flow
+  IR_RETURN,
+  // Arithmetic
+  IR_ADD,
+  IR_SUB,
+  IR_MUL,
+  IR_DIV,
+  // Memory
+  IR_LOAD_LOCAL,
+  IR_STORE_LOCAL,
+  // Stack operations
+  IR_PUSH,
+  IR_POP
 } IROpcode;
 
-typedef enum {
-    OPERAND_REGISTER,
-    OPERAND_CONSTANT,
-    OPERAND_LOCAL
-} OperandType;
+typedef enum { OPERAND_REGISTER, OPERAND_CONSTANT, OPERAND_LOCAL } OperandType;
 
 typedef struct {
-    int int_value;
-    float float_value;
+  int int_value;
+  float float_value;
 } ConstantValue;
 
 typedef struct {
-    OperandType type;
-    Type value_type;
-    union {
-        int reg;
-        ConstantValue constant;
-        int local_index;
-    } value;
+  OperandType type;
+  Type value_type;
+  union {
+    int reg;
+    ConstantValue constant;
+    int local_index;
+  } value;
 } Operand;
 
 typedef struct {
-    IROpcode opcode;
-    Type result_type;
-    Operand operands[3];
-    int operand_count;
-    int result_reg;
+  IROpcode opcode;
+  Type result_type;
+  Operand operands[3];
+  int operand_count;
+  int result_reg;
 } Instruction;
 
 typedef struct {
-    Instruction* instructions;
-    size_t instruction_count;
-    size_t capacity;
+  Instruction* instructions;
+  size_t instruction_count;
+  size_t capacity;
 } IRFunction;
 
 typedef struct {
-    IRFunction* functions;
-    size_t function_count;
+  IRFunction* functions;
+  size_t function_count;
 } IRModule;
 
 // IR generation

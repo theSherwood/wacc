@@ -1,6 +1,4 @@
 #include "compiler.h"
-#include <ctype.h>
-#include <string.h>
 
 Lexer* lexer_create(Arena* arena, const char* source) {
     Lexer* lexer = arena_alloc(arena, sizeof(Lexer));
@@ -14,7 +12,7 @@ Lexer* lexer_create(Arena* arena, const char* source) {
 }
 
 static void skip_whitespace(Lexer* lexer) {
-    while (isspace(*lexer->current)) {
+    while (is_space(*lexer->current)) {
         if (*lexer->current == '\n') {
             lexer->line++;
             lexer->column = 1;
@@ -34,18 +32,18 @@ static void skip_line_comment(Lexer* lexer) {
 }
 
 static bool is_identifier_start(char c) {
-    return isalpha(c) || c == '_';
+    return is_alpha(c) || c == '_';
 }
 
 static bool is_identifier_char(char c) {
-    return isalnum(c) || c == '_';
+    return is_alnum(c) || c == '_';
 }
 
 static TokenType get_keyword_type(const char* start, size_t length) {
-    if (length == 3 && strncmp(start, "int", 3) == 0) {
+    if (length == 3 && str_ncmp(start, "int", 3) == 0) {
         return TOKEN_INT;
     }
-    if (length == 6 && strncmp(start, "return", 6) == 0) {
+    if (length == 6 && str_ncmp(start, "return", 6) == 0) {
         return TOKEN_RETURN;
     }
     return TOKEN_IDENTIFIER;
@@ -112,9 +110,9 @@ Token lexer_next_token(Lexer* lexer) {
                 }
                 token.length = lexer->current - token.start;
                 token.type = get_keyword_type(token.start, token.length);
-            } else if (isdigit(c)) {
+            } else if (is_digit(c)) {
                 // Integer literal
-                while (isdigit(*lexer->current)) {
+                while (is_digit(*lexer->current)) {
                     lexer->current++;
                     lexer->column++;
                 }

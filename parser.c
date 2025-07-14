@@ -1,6 +1,4 @@
 #include "compiler.h"
-#include <string.h>
-#include <stdlib.h>
 
 Parser* parser_create(Arena* arena, Lexer* lexer) {
     Parser* parser = arena_alloc(arena, sizeof(Parser));
@@ -39,7 +37,7 @@ static ASTNode* parse_expression(Parser* parser) {
         
         // Parse the integer value
         char* endptr;
-        node->data.integer_constant.value = strtol(parser->current_token.start, &endptr, 10);
+        node->data.integer_constant.value = str_to_long(parser->current_token.start, &endptr, 10);
         
         advance_token(parser);
         return node;
@@ -84,7 +82,7 @@ static ASTNode* parse_function(Parser* parser) {
     size_t name_len = parser->current_token.length;
     char* name = arena_alloc(parser->arena, name_len + 1);
     if (!name) return NULL;
-    strncpy(name, parser->current_token.start, name_len);
+    str_ncpy(name, parser->current_token.start, name_len);
     name[name_len] = '\0';
     node->data.function.name = name;
     

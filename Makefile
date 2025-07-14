@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -g
 TARGET = wacc
-SOURCES = main.c arena.c lexer.c parser.c ir.c codegen.c
+SOURCES = main.c arena.c lexer.c parser.c ir.c codegen.c utils.c
 
 all: $(TARGET)
 

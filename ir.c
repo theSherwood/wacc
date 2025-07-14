@@ -1,13 +1,12 @@
 #include "compiler.h"
 #include <stdio.h>
-#include <string.h>
 
 static void ir_emit_instruction(IRFunction* func, Arena* arena, IROpcode opcode, Type result_type, Operand* operands, int operand_count, int result_reg) {
     if (func->instruction_count >= func->capacity) {
         func->capacity = func->capacity ? func->capacity * 2 : 16;
         Instruction* new_instructions = arena_alloc(arena, func->capacity * sizeof(Instruction));
         if (func->instructions) {
-            memcpy(new_instructions, func->instructions, func->instruction_count * sizeof(Instruction));
+            mem_cpy(new_instructions, func->instructions, func->instruction_count * sizeof(Instruction));
         }
         func->instructions = new_instructions;
     }

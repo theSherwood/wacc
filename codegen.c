@@ -1,6 +1,5 @@
 #include "compiler.h"
 #include <stdio.h>
-#include <string.h>
 #include <stdint.h>
 
 // WASM bytecode constants
@@ -46,7 +45,7 @@ static void buffer_ensure_capacity(Buffer* buf, Arena* arena, size_t needed) {
             new_capacity *= 2;
         }
         uint8_t* new_data = arena_alloc(arena, new_capacity);
-        memcpy(new_data, buf->data, buf->size);
+        mem_cpy(new_data, buf->data, buf->size);
         buf->data = new_data;
         buf->capacity = new_capacity;
     }
@@ -88,10 +87,10 @@ static void buffer_write_leb128_i32(Buffer* buf, Arena* arena, int32_t value) {
 }
 
 static void buffer_write_string(Buffer* buf, Arena* arena, const char* str) {
-    size_t len = strlen(str);
+    size_t len = str_len(str);
     buffer_write_leb128_u32(buf, arena, (uint32_t)len);
     buffer_ensure_capacity(buf, arena, len);
-    memcpy(buf->data + buf->size, str, len);
+    mem_cpy(buf->data + buf->size, str, len);
     buf->size += len;
 }
 
@@ -115,7 +114,7 @@ static void emit_type_section(Buffer* buf, Arena* arena) {
     
     emit_section_header(buf, arena, SECTION_TYPE, content.size);
     buffer_ensure_capacity(buf, arena, content.size);
-    memcpy(buf->data + buf->size, content.data, content.size);
+    mem_cpy(buf->data + buf->size, content.data, content.size);
     buf->size += content.size;
 }
 
@@ -131,7 +130,7 @@ static void emit_function_section(Buffer* buf, Arena* arena) {
     
     emit_section_header(buf, arena, SECTION_FUNCTION, content.size);
     buffer_ensure_capacity(buf, arena, content.size);
-    memcpy(buf->data + buf->size, content.data, content.size);
+    mem_cpy(buf->data + buf->size, content.data, content.size);
     buf->size += content.size;
 }
 
@@ -149,7 +148,7 @@ static void emit_export_section(Buffer* buf, Arena* arena) {
     
     emit_section_header(buf, arena, SECTION_EXPORT, content.size);
     buffer_ensure_capacity(buf, arena, content.size);
-    memcpy(buf->data + buf->size, content.data, content.size);
+    mem_cpy(buf->data + buf->size, content.data, content.size);
     buf->size += content.size;
 }
 
@@ -196,12 +195,12 @@ static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
     // Write function body size and body
     buffer_write_leb128_u32(&content, arena, (uint32_t)func_body.size);
     buffer_ensure_capacity(&content, arena, func_body.size);
-    memcpy(content.data + content.size, func_body.data, func_body.size);
+    mem_cpy(content.data + content.size, func_body.data, func_body.size);
     content.size += func_body.size;
     
     emit_section_header(buf, arena, SECTION_CODE, content.size);
     buffer_ensure_capacity(buf, arena, content.size);
-    memcpy(buf->data + buf->size, content.data, content.size);
+    mem_cpy(buf->data + buf->size, content.data, content.size);
     buf->size += content.size;
 }
 
