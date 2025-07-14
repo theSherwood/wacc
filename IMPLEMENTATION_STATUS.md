@@ -10,7 +10,8 @@
 - **Lexer**: Recognizes `int`, `main`, `return`, `{`, `}`, `(`, `)`, `;`, integer literals
 - **Parser**: Handles simple function declaration with return statement
 - **AST**: `Program(Function(name, Statement))` where `Statement` is `Return(Constant(int))`
-- **Codegen**: Generates WASM function that returns integer constant
+- **IR**: Intermediate representation with instructions for constants and return
+- **Codegen**: Generates WASM bytecode (not WAT text) that returns integer constant
 
 **Grammar Implemented**:
 ```
@@ -21,28 +22,25 @@
 ```
 
 **Files Created**:
-- `compiler.h` - Main header with type definitions
+- `compiler.h` - Main header with type definitions and IR types
 - `arena.c` - Arena memory allocator
 - `lexer.c` - Lexical analyzer
 - `parser.c` - Recursive descent parser
-- `codegen.c` - WASM code generator
+- `ir.c` - Intermediate representation generation
+- `codegen.c` - WASM bytecode generator
 - `main.c` - Compiler driver
 - `Makefile` - Build system
 
 **Test Results**:
 - Input: `int main() { return 42; }`
-- Output: Valid WASM module with `main` function returning `42`
+- Output: Valid WASM bytecode module with `main` function returning `42`
 - Verification: WASM execution returns correct result
 
-**Example Output**:
-```wat
-(module
-  (func $main (result i32)
-    i32.const 42
-  )
-  (export "main" (func $main))
-)
-```
+**Pipeline**:
+1. C source → Lexer → Parser → AST
+2. AST → IR generation → IRModule 
+3. IRModule → Codegen → WASM bytecode
+4. WASM bytecode executed successfully
 
 ## Next Steps
 

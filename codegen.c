@@ -1,47 +1,232 @@
 #include "compiler.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
-static void emit_wasm_function(FILE* file, ASTNode* function_node) {
-    fprintf(file, "  (func $%s (result i32)\n", function_node->data.function.name);
-    
-    // Generate code for the statement
-    ASTNode* stmt = function_node->data.function.statement;
-    if (stmt->type == AST_RETURN_STATEMENT) {
-        ASTNode* expr = stmt->data.return_statement.expression;
-        if (expr->type == AST_INTEGER_CONSTANT) {
-            fprintf(file, "    i32.const %d\n", expr->data.integer_constant.value);
-        }
-    }
-    
-    fprintf(file, "  )\n");
+// WASM bytecode constants
+#define WASM_MAGIC 0x6d736100  // '\0asm'
+#define WASM_VERSION 0x00000001
+
+// WASM section types
+#define SECTION_TYPE 1
+#define SECTION_FUNCTION 3
+#define SECTION_CODE 10
+#define SECTION_EXPORT 7
+
+// WASM value types
+#define WASM_I32_TYPE 0x7f
+#define WASM_I64_TYPE 0x7e
+#define WASM_F32_TYPE 0x7d
+#define WASM_F64_TYPE 0x7c
+
+// WASM opcodes
+#define WASM_I32_CONST 0x41
+#define WASM_RETURN 0x0f
+#define WASM_END 0x0b
+
+// WASM export types
+#define EXPORT_FUNC 0x00
+
+typedef struct {
+    uint8_t* data;
+    size_t size;
+    size_t capacity;
+} Buffer;
+
+static void buffer_init(Buffer* buf, Arena* arena, size_t initial_capacity) {
+    buf->data = arena_alloc(arena, initial_capacity);
+    buf->size = 0;
+    buf->capacity = initial_capacity;
 }
 
-void codegen_emit_wasm(Arena* arena, ASTNode* ast, const char* output_path) {
-    (void)arena; // Unused parameter
-    if (!ast || ast->type != AST_PROGRAM) {
+static void buffer_ensure_capacity(Buffer* buf, Arena* arena, size_t needed) {
+    if (buf->size + needed > buf->capacity) {
+        size_t new_capacity = buf->capacity;
+        while (new_capacity < buf->size + needed) {
+            new_capacity *= 2;
+        }
+        uint8_t* new_data = arena_alloc(arena, new_capacity);
+        memcpy(new_data, buf->data, buf->size);
+        buf->data = new_data;
+        buf->capacity = new_capacity;
+    }
+}
+
+static void buffer_write_byte(Buffer* buf, Arena* arena, uint8_t byte) {
+    buffer_ensure_capacity(buf, arena, 1);
+    buf->data[buf->size++] = byte;
+}
+
+static void buffer_write_u32(Buffer* buf, Arena* arena, uint32_t value) {
+    buffer_ensure_capacity(buf, arena, 4);
+    buf->data[buf->size++] = (uint8_t)(value & 0xff);
+    buf->data[buf->size++] = (uint8_t)((value >> 8) & 0xff);
+    buf->data[buf->size++] = (uint8_t)((value >> 16) & 0xff);
+    buf->data[buf->size++] = (uint8_t)((value >> 24) & 0xff);
+}
+
+static void buffer_write_leb128_u32(Buffer* buf, Arena* arena, uint32_t value) {
+    while (value >= 0x80) {
+        buffer_write_byte(buf, arena, (uint8_t)((value & 0x7f) | 0x80));
+        value >>= 7;
+    }
+    buffer_write_byte(buf, arena, (uint8_t)(value & 0x7f));
+}
+
+static void buffer_write_leb128_i32(Buffer* buf, Arena* arena, int32_t value) {
+    bool more = true;
+    while (more) {
+        uint8_t byte = value & 0x7f;
+        value >>= 7;
+        if ((value == 0 && (byte & 0x40) == 0) || (value == -1 && (byte & 0x40) != 0)) {
+            more = false;
+        } else {
+            byte |= 0x80;
+        }
+        buffer_write_byte(buf, arena, byte);
+    }
+}
+
+static void buffer_write_string(Buffer* buf, Arena* arena, const char* str) {
+    size_t len = strlen(str);
+    buffer_write_leb128_u32(buf, arena, (uint32_t)len);
+    buffer_ensure_capacity(buf, arena, len);
+    memcpy(buf->data + buf->size, str, len);
+    buf->size += len;
+}
+
+static void emit_section_header(Buffer* buf, Arena* arena, uint8_t section_type, size_t content_size) {
+    buffer_write_byte(buf, arena, section_type);
+    buffer_write_leb128_u32(buf, arena, (uint32_t)content_size);
+}
+
+static void emit_type_section(Buffer* buf, Arena* arena) {
+    Buffer content;
+    buffer_init(&content, arena, 64);
+    
+    // Number of types
+    buffer_write_leb128_u32(&content, arena, 1);
+    
+    // Function type 0: [] -> [i32]
+    buffer_write_byte(&content, arena, 0x60);  // func type
+    buffer_write_leb128_u32(&content, arena, 0);  // param count
+    buffer_write_leb128_u32(&content, arena, 1);  // result count
+    buffer_write_byte(&content, arena, WASM_I32_TYPE);  // i32
+    
+    emit_section_header(buf, arena, SECTION_TYPE, content.size);
+    buffer_ensure_capacity(buf, arena, content.size);
+    memcpy(buf->data + buf->size, content.data, content.size);
+    buf->size += content.size;
+}
+
+static void emit_function_section(Buffer* buf, Arena* arena) {
+    Buffer content;
+    buffer_init(&content, arena, 64);
+    
+    // Number of functions
+    buffer_write_leb128_u32(&content, arena, 1);
+    
+    // Function 0 uses type 0
+    buffer_write_leb128_u32(&content, arena, 0);
+    
+    emit_section_header(buf, arena, SECTION_FUNCTION, content.size);
+    buffer_ensure_capacity(buf, arena, content.size);
+    memcpy(buf->data + buf->size, content.data, content.size);
+    buf->size += content.size;
+}
+
+static void emit_export_section(Buffer* buf, Arena* arena) {
+    Buffer content;
+    buffer_init(&content, arena, 64);
+    
+    // Number of exports
+    buffer_write_leb128_u32(&content, arena, 1);
+    
+    // Export "main" function
+    buffer_write_string(&content, arena, "main");
+    buffer_write_byte(&content, arena, EXPORT_FUNC);
+    buffer_write_leb128_u32(&content, arena, 0);  // function index
+    
+    emit_section_header(buf, arena, SECTION_EXPORT, content.size);
+    buffer_ensure_capacity(buf, arena, content.size);
+    memcpy(buf->data + buf->size, content.data, content.size);
+    buf->size += content.size;
+}
+
+static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
+    switch (inst->opcode) {
+        case IR_CONST_INT: {
+            buffer_write_byte(buf, arena, WASM_I32_CONST);
+            buffer_write_leb128_i32(buf, arena, inst->operands[0].value.constant.int_value);
+            break;
+        }
+        case IR_RETURN: {
+            buffer_write_byte(buf, arena, WASM_RETURN);
+            break;
+        }
+        default:
+            // Handle other instructions later
+            break;
+    }
+}
+
+static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
+    Buffer content;
+    buffer_init(&content, arena, 256);
+    
+    // Number of functions
+    buffer_write_leb128_u32(&content, arena, 1);
+    
+    // Function 0 body
+    Buffer func_body;
+    buffer_init(&func_body, arena, 128);
+    
+    // Local declarations count
+    buffer_write_leb128_u32(&func_body, arena, 0);
+    
+    // Generate instructions
+    IRFunction* func = &ir_module->functions[0];
+    for (size_t i = 0; i < func->instruction_count; i++) {
+        emit_instruction(&func_body, arena, &func->instructions[i]);
+    }
+    
+    // End instruction
+    buffer_write_byte(&func_body, arena, WASM_END);
+    
+    // Write function body size and body
+    buffer_write_leb128_u32(&content, arena, (uint32_t)func_body.size);
+    buffer_ensure_capacity(&content, arena, func_body.size);
+    memcpy(content.data + content.size, func_body.data, func_body.size);
+    content.size += func_body.size;
+    
+    emit_section_header(buf, arena, SECTION_CODE, content.size);
+    buffer_ensure_capacity(buf, arena, content.size);
+    memcpy(buf->data + buf->size, content.data, content.size);
+    buf->size += content.size;
+}
+
+void codegen_emit_wasm(Arena* arena, IRModule* ir_module, const char* output_path) {
+    if (!ir_module || ir_module->function_count == 0) {
         return;
     }
     
-    FILE* file = fopen(output_path, "w");
-    if (!file) {
-        return;
+    Buffer buf;
+    buffer_init(&buf, arena, 1024);
+    
+    // WASM magic and version
+    buffer_write_u32(&buf, arena, WASM_MAGIC);
+    buffer_write_u32(&buf, arena, WASM_VERSION);
+    
+    // Emit sections
+    emit_type_section(&buf, arena);
+    emit_function_section(&buf, arena);
+    emit_export_section(&buf, arena);
+    emit_code_section(&buf, arena, ir_module);
+    
+    // Write to file
+    FILE* file = fopen(output_path, "wb");
+    if (file) {
+        fwrite(buf.data, 1, buf.size, file);
+        fclose(file);
     }
-    
-    // Write WASM module header
-    fprintf(file, "(module\n");
-    
-    // Generate function
-    ASTNode* function = ast->data.program.function;
-    emit_wasm_function(file, function);
-    
-    // Export the function if it's main
-    if (strcmp(function->data.function.name, "main") == 0) {
-        fprintf(file, "  (export \"main\" (func $main))\n");
-    }
-    
-    // Close module
-    fprintf(file, ")\n");
-    
-    fclose(file);
 }

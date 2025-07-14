@@ -76,10 +76,19 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // Generate WASM
-  codegen_emit_wasm(arena, ast, "out.wat");
+  // Generate IR
+  IRModule* ir_module = ir_generate(arena, ast);
+  if (!ir_module) {
+    printf("Error: IR generation failed\n");
+    arena_free(arena);
+    free(source);
+    return 1;
+  }
 
-  printf("Compilation successful. Output written to out.wat\n");
+  // Generate WASM
+  codegen_emit_wasm(arena, ir_module, "out.wasm");
+
+  printf("Compilation successful. Output written to out.wasm\n");
 
   // Cleanup
   arena_free(arena);

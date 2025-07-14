@@ -1,13 +1,8 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 
-// Convert WAT to WASM
-try {
-    execSync('wat2wasm out.wat -o out.wasm', { stdio: 'inherit' });
-} catch (error) {
-    console.log('wat2wasm not available, skipping binary conversion');
-    process.exit(0);
-}
+// We now generate WASM directly, so no conversion needed
+console.log('Loading WASM module...');
 
 // Load and run the WASM module
 const wasmBuffer = fs.readFileSync('out.wasm');

@@ -77,7 +77,91 @@ typedef struct Parser {
 Parser* parser_create(Arena* arena, Lexer* lexer);
 ASTNode* parser_parse_program(Parser* parser);
 
+// IR types
+typedef enum {
+    WASM_I32,
+    WASM_I64,
+    WASM_F32,
+    WASM_F64,
+    WASM_FUNCREF,
+    WASM_EXTERNREF
+} WASMType;
+
+typedef enum {
+    TYPE_VOID,
+    TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64,
+    TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64,
+    TYPE_F32, TYPE_F64,
+    TYPE_POINTER,
+    TYPE_ARRAY,
+    TYPE_STRUCT,
+    TYPE_FUNCTION
+} TypeKind;
+
+typedef struct Type {
+    TypeKind kind;
+    WASMType wasm_type;
+    size_t size;
+    size_t alignment;
+} Type;
+
+typedef enum {
+    // Constants
+    IR_CONST_INT,
+    // Control Flow
+    IR_RETURN,
+    // Arithmetic
+    IR_ADD, IR_SUB, IR_MUL, IR_DIV,
+    // Memory
+    IR_LOAD_LOCAL, IR_STORE_LOCAL,
+    // Stack operations
+    IR_PUSH, IR_POP
+} IROpcode;
+
+typedef enum {
+    OPERAND_REGISTER,
+    OPERAND_CONSTANT,
+    OPERAND_LOCAL
+} OperandType;
+
+typedef struct {
+    int int_value;
+    float float_value;
+} ConstantValue;
+
+typedef struct {
+    OperandType type;
+    Type value_type;
+    union {
+        int reg;
+        ConstantValue constant;
+        int local_index;
+    } value;
+} Operand;
+
+typedef struct {
+    IROpcode opcode;
+    Type result_type;
+    Operand operands[3];
+    int operand_count;
+    int result_reg;
+} Instruction;
+
+typedef struct {
+    Instruction* instructions;
+    size_t instruction_count;
+    size_t capacity;
+} IRFunction;
+
+typedef struct {
+    IRFunction* functions;
+    size_t function_count;
+} IRModule;
+
+// IR generation
+IRModule* ir_generate(Arena* arena, ASTNode* ast);
+
 // Code generation
-void codegen_emit_wasm(Arena* arena, ASTNode* ast, const char* output_path);
+void codegen_emit_wasm(Arena* arena, IRModule* ir_module, const char* output_path);
 
 #endif  // COMPILER_H
