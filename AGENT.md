@@ -4,6 +4,13 @@ Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it 
 
 @IR_OUTLINE.md has the plan for the intermediate representation.
 
+# Build Commands
+
+- `make` - Build the compiler
+- `make test` - Build and test with test_simple.c
+- `make clean` - Clean build artifacts
+- `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wat)
+
 # When writing code
 
 - Use functions instead of objects wherever possible
