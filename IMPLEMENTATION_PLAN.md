@@ -203,7 +203,8 @@ Refer to https://norasandler.com/2017/11/29/Write-a-Compiler.html
 - **Lexer**: Recognize `int`, `main`, `return`, `{`, `}`, `(`, `)`, `;`, integer literals
 - **Parser**: Handle simple function declaration with return statement
 - **AST**: `Program(Function(name, Statement))` where `Statement` is `Return(Constant(int))`
-- **Codegen**: Generate WASM function that returns integer constant
+- **IR**: Initialize IR structure with basic `Function` and `Region` types, implement `IR_CONST_INT` and `IR_RETURN` instructions
+- **Codegen**: Generate WASM function that returns integer constant from IR
 
 **Grammar**:
 
@@ -227,7 +228,8 @@ Refer to https://norasandler.com/2017/12/05/Write-a-Compiler-2.html
 - **Lexer**: Recognize unary operators
 - **Parser**: Handle operator precedence for unary expressions
 - **AST**: Add `UnaryOp(operator, operand)` node
-- **Codegen**: Generate appropriate WASM instructions (i32.eqz, i32.sub, etc.)
+- **IR**: Add `IR_NEG`, `IR_NOT`, `IR_BITWISE_NOT` instructions and virtual register system
+- **Codegen**: Generate appropriate WASM instructions (i32.eqz, i32.sub, etc.) from IR
 
 **Grammar additions**:
 
@@ -248,7 +250,8 @@ and https://norasandler.com/2017/12/28/Write-a-Compiler-4.html
 - **Lexer**: Recognize binary operators
 - **Parser**: Handle operator precedence and associativity
 - **AST**: Add `BinaryOp(left, operator, right)` node
-- **Codegen**: Generate WASM arithmetic instructions
+- **IR**: Add `IR_ADD`, `IR_SUB`, `IR_MUL`, `IR_DIV`, `IR_MOD`, comparison and logical operators
+- **Codegen**: Generate WASM arithmetic instructions from IR
 
 **Grammar additions**:
 
@@ -277,7 +280,8 @@ Refer to https://norasandler.com/2018/01/08/Write-a-Compiler-5.html
 - **Parser**: Handle variable declarations and assignments
 - **AST**: Add `Declaration(type, name, initializer)` and `Assignment(name, value)` nodes
 - **Semantic**: Symbol table for local variables
-- **Codegen**: WASM local variables and get/set operations
+- **IR**: Add `IR_LOAD_LOCAL`, `IR_STORE_LOCAL`, `IR_ALLOCA` instructions and local variable management
+- **Codegen**: WASM local variables and get/set operations from IR
 
 **Grammar additions**:
 
@@ -299,7 +303,8 @@ Refer to https://norasandler.com/2018/02/25/Write-a-Compiler-6.html
 - **Lexer**: Recognize `if`, `else`, `?`, `:`
 - **Parser**: Handle conditional statements and expressions
 - **AST**: Add `If(condition, then_stmt, else_stmt)` and `Ternary(condition, true_exp, false_exp)` nodes
-- **Codegen**: WASM if/else blocks and branches
+- **IR**: Add `IR_IF`, `IR_ELSE`, `IR_END` instructions and structured control flow regions
+- **Codegen**: WASM if/else blocks and branches from IR structured control flow
 
 **Grammar additions**:
 
@@ -321,7 +326,8 @@ Refer to https://norasandler.com/2018/03/14/Write-a-Compiler-7.html
 - **Parser**: Handle statement blocks
 - **AST**: Add `Compound(statements)` node
 - **Semantic**: Block scope for variables
-- **Codegen**: WASM block structure
+- **IR**: Add `IR_BLOCK` instruction and nested region management
+- **Codegen**: WASM block structure from IR regions
 
 **Grammar additions**:
 
@@ -341,7 +347,8 @@ Refer to https://norasandler.com/2018/04/10/Write-a-Compiler-8.html
 - **Lexer**: Recognize `for`, `while`, `do`, `break`, `continue`
 - **Parser**: Handle loop constructs
 - **AST**: Add `While(condition, body)`, `For(init, condition, update, body)`, `DoWhile(body, condition)` nodes
-- **Codegen**: WASM loop blocks and branches
+- **IR**: Add `IR_LOOP`, `IR_BREAK`, `IR_CONTINUE` instructions and loop region management
+- **Codegen**: WASM loop blocks and branches from IR structured control flow
 
 ### Step 8: Functions
 
@@ -354,13 +361,19 @@ Refer to https://norasandler.com/2018/06/27/Write-a-Compiler-9.html
 - **Parser**: Handle function parameters and calls
 - **AST**: Add `FunctionCall(name, arguments)` and update `Function` node
 - **Semantic**: Function signature validation
-- **Codegen**: WASM function calls and parameter passing
+- **IR**: Add `IR_CALL` instruction and function table management
+- **Codegen**: WASM function calls and parameter passing from IR
 
 ### Step 9: Global Variables
 
 Refer to https://norasandler.com/2019/02/18/Write-a-Compiler-10.html
 
 **Goal**: Add global variables
+
+**New features**:
+
+- **IR**: Add `IR_LOAD_GLOBAL`, `IR_STORE_GLOBAL` instructions and global variable management
+- **Codegen**: WASM global variables and data section from IR
 
 ### Step 10: Arrays and Pointers
 
@@ -371,7 +384,8 @@ Refer to https://norasandler.com/2019/02/18/Write-a-Compiler-10.html
 - **Lexer**: Recognize `[`, `]`, `*`, `&`
 - **Parser**: Handle array declarations and pointer operations
 - **AST**: Add array and pointer nodes
-- **Codegen**: WASM linear memory operations
+- **IR**: Add `IR_LOAD`, `IR_STORE` instructions and pointer arithmetic operations
+- **Codegen**: WASM linear memory operations from IR
 
 ### Step 11: Structs
 
@@ -382,7 +396,8 @@ Refer to https://norasandler.com/2019/02/18/Write-a-Compiler-10.html
 - **Lexer**: Recognize `struct`, `.`, `->`
 - **Parser**: Handle struct definitions and member access
 - **AST**: Add struct-related nodes
-- **Codegen**: WASM memory layout for structs
+- **IR**: Add struct member access instructions and memory layout calculation
+- **Codegen**: WASM memory layout for structs from IR
 
 ### Step 12: Standard Library Subset
 
@@ -391,7 +406,8 @@ Refer to https://norasandler.com/2019/02/18/Write-a-Compiler-10.html
 **New features**:
 
 - **Semantic**: Built-in function declarations
-- **Codegen**: Import external functions (printf, malloc, etc.)
+- **IR**: Add `IR_CALL_INDIRECT` instruction for external function calls
+- **Codegen**: Import external functions (printf, malloc, etc.) from IR
 
 ### Step 13: Optimization and Cleanup
 
@@ -399,6 +415,7 @@ Refer to https://norasandler.com/2019/02/18/Write-a-Compiler-10.html
 
 **New features**:
 
-- **Optimization**: Dead code elimination, constant folding
+- **IR**: Add optimization passes (dead code elimination, constant folding) on IR
+- **Optimization**: Dead code elimination, constant folding at IR level
 - **Error handling**: Better error messages and recovery
 - **Testing**: Comprehensive test suite
