@@ -165,7 +165,7 @@ typedef struct {
 ### Error Reporting Format
 
 ```
-filename.c:line:column: error: message
+filename.c:line:column: id: error_id error: message
    source code line
    ^^^^^^^^^^^
 note: suggestion (if available)

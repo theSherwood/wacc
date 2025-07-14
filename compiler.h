@@ -5,11 +5,80 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Error handling system
+typedef struct {
+    const char* filename;
+    int line;
+    int column;
+    int start_pos;
+    int end_pos;
+} SourceLocation;
+
+typedef enum {
+    ERROR_LEXICAL,
+    ERROR_SYNTAX,
+    ERROR_SEMANTIC,
+    ERROR_CODEGEN,
+    WARNING
+} ErrorLevel;
+
+typedef struct {
+    int id;
+    ErrorLevel level;
+    SourceLocation location;
+    const char* message;
+    const char* suggestion;  // Optional fix suggestion
+    const char* context;     // Relevant source line
+} CompilerError;
+
+typedef struct {
+    CompilerError* errors;
+    size_t count;
+    size_t capacity;
+    bool has_fatal_errors;
+} ErrorList;
+
+// Error IDs - grouped by category
+#define ERROR_LEX_INVALID_CHARACTER        1001
+#define ERROR_LEX_UNTERMINATED_STRING      1002
+#define ERROR_LEX_UNTERMINATED_COMMENT     1003
+#define ERROR_LEX_INVALID_ESCAPE_SEQUENCE  1004
+#define ERROR_LEX_NUMBER_TOO_LARGE         1005
+
+#define ERROR_SYNTAX_EXPECTED_TOKEN        2001
+#define ERROR_SYNTAX_UNEXPECTED_TOKEN      2002
+#define ERROR_SYNTAX_MISSING_SEMICOLON     2003
+#define ERROR_SYNTAX_MISSING_BRACE         2004
+#define ERROR_SYNTAX_MISSING_PAREN         2005
+#define ERROR_SYNTAX_MALFORMED_EXPRESSION  2006
+#define ERROR_SYNTAX_EXPECTED_FUNCTION     2007
+#define ERROR_SYNTAX_EXPECTED_STATEMENT    2008
+#define ERROR_SYNTAX_EXPECTED_EXPRESSION   2009
+
+#define ERROR_SEM_UNDEFINED_VARIABLE       3001
+#define ERROR_SEM_UNDEFINED_FUNCTION       3002
+#define ERROR_SEM_TYPE_MISMATCH            3003
+#define ERROR_SEM_REDEFINITION             3004
+#define ERROR_SEM_INVALID_ASSIGNMENT       3005
+
+#define ERROR_CODEGEN_WASM_LIMIT_EXCEEDED   4001
+#define ERROR_CODEGEN_INVALID_MEMORY_ACCESS 4002
+#define ERROR_CODEGEN_UNSUPPORTED_OPERATION 4003
+
 // Memory management
 typedef struct Arena Arena;
 Arena* arena_init();
 void arena_free(Arena* arena);
 void* arena_alloc(Arena* arena, size_t size);
+
+// Error handling functions
+ErrorList* error_list_create(Arena* arena);
+void error_list_add(ErrorList* errors, Arena* arena, int id, ErrorLevel level, 
+                   SourceLocation location, const char* message, const char* suggestion, 
+                   const char* context);
+void error_list_print(ErrorList* errors, const char* filename);
+bool error_list_has_errors(ErrorList* errors);
+const char* get_source_context(Arena* arena, const char* source, int line);
 
 // Utility functions (stdlib replacements)
 bool is_space(char c);
@@ -51,9 +120,11 @@ typedef struct Lexer {
   const char* current;
   int line;
   int column;
+  ErrorList* errors;
+  const char* filename;
 } Lexer;
 
-Lexer* lexer_create(Arena* arena, const char* source);
+Lexer* lexer_create(Arena* arena, const char* source, const char* filename, ErrorList* errors);
 Token lexer_next_token(Lexer* lexer);
 
 // AST nodes
@@ -83,9 +154,10 @@ typedef struct Parser {
   Lexer* lexer;
   Token current_token;
   Arena* arena;
+  ErrorList* errors;
 } Parser;
 
-Parser* parser_create(Arena* arena, Lexer* lexer);
+Parser* parser_create(Arena* arena, Lexer* lexer, ErrorList* errors);
 ASTNode* parser_parse_program(Parser* parser);
 
 // IR types

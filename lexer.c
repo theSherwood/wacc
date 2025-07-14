@@ -1,6 +1,6 @@
 #include "compiler.h"
 
-Lexer* lexer_create(Arena* arena, const char* source) {
+Lexer* lexer_create(Arena* arena, const char* source, const char* filename, ErrorList* errors) {
     Lexer* lexer = arena_alloc(arena, sizeof(Lexer));
     if (!lexer) return NULL;
     
@@ -8,6 +8,8 @@ Lexer* lexer_create(Arena* arena, const char* source) {
     lexer->current = source;
     lexer->line = 1;
     lexer->column = 1;
+    lexer->errors = errors;
+    lexer->filename = filename;
     return lexer;
 }
 
@@ -119,6 +121,21 @@ Token lexer_next_token(Lexer* lexer) {
                 token.type = TOKEN_INTEGER_LITERAL;
                 token.length = lexer->current - token.start;
             } else {
+                // Report lexical error
+                if (lexer->errors) {
+                    SourceLocation location = {
+                        .filename = lexer->filename,
+                        .line = lexer->line,
+                        .column = lexer->column - 1, // Column where error started
+                        .start_pos = lexer->current - lexer->source - 1,
+                        .end_pos = lexer->current - lexer->source
+                    };
+                    
+                    error_list_add(lexer->errors, NULL, 
+                                  ERROR_LEX_INVALID_CHARACTER, ERROR_LEXICAL, location, 
+                                  "unexpected character", "remove this character", NULL);
+                }
+                
                 token.type = TOKEN_ERROR;
                 token.length = 1;
             }

@@ -1,17 +1,44 @@
 #include "compiler.h"
 
-Parser* parser_create(Arena* arena, Lexer* lexer) {
+Parser* parser_create(Arena* arena, Lexer* lexer, ErrorList* errors) {
     Parser* parser = arena_alloc(arena, sizeof(Parser));
     if (!parser) return NULL;
     
     parser->lexer = lexer;
     parser->arena = arena;
+    parser->errors = errors;
     parser->current_token = lexer_next_token(lexer);
     return parser;
 }
 
 static void advance_token(Parser* parser) {
     parser->current_token = lexer_next_token(parser->lexer);
+}
+
+static void report_error(Parser* parser, int error_id, const char* message, const char* suggestion) {
+    if (!parser->errors) return;
+    
+    SourceLocation location = {
+        .filename = parser->lexer->filename,
+        .line = parser->current_token.line,
+        .column = parser->current_token.column,
+        .start_pos = parser->current_token.start - parser->lexer->source,
+        .end_pos = parser->current_token.start - parser->lexer->source + parser->current_token.length
+    };
+    
+    error_list_add(parser->errors, NULL, error_id, ERROR_SYNTAX, location, message, suggestion, NULL);
+}
+
+static void synchronize(Parser* parser) {
+    // Skip tokens until we reach a synchronization point
+    while (parser->current_token.type != TOKEN_EOF) {
+        if (parser->current_token.type == TOKEN_SEMICOLON ||
+            parser->current_token.type == TOKEN_OPEN_BRACE ||
+            parser->current_token.type == TOKEN_CLOSE_BRACE) {
+            return;
+        }
+        advance_token(parser);
+    }
 }
 
 static bool match_token(Parser* parser, TokenType type) {
@@ -43,7 +70,10 @@ static ASTNode* parse_expression(Parser* parser) {
         return node;
     }
     
-    return NULL; // Error: expected expression
+    // Error: expected expression
+    report_error(parser, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add an integer literal");
+    synchronize(parser);
+    return NULL;
 }
 
 static ASTNode* parse_statement(Parser* parser) {
@@ -53,26 +83,36 @@ static ASTNode* parse_statement(Parser* parser) {
         
         node->data.return_statement.expression = parse_expression(parser);
         if (!node->data.return_statement.expression) {
-            return NULL; // Error: expected expression
+            // Error already reported by parse_expression
+            return NULL;
         }
         
         if (!match_token(parser, TOKEN_SEMICOLON)) {
-            return NULL; // Error: expected semicolon
+            report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';'", "add a semicolon");
+            synchronize(parser);
+            return NULL;
         }
         
         return node;
     }
     
-    return NULL; // Error: expected statement
+    // Error: expected statement
+    report_error(parser, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add a return statement");
+    synchronize(parser);
+    return NULL;
 }
 
 static ASTNode* parse_function(Parser* parser) {
     if (!match_token(parser, TOKEN_INT)) {
-        return NULL; // Error: expected 'int'
+        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'int'", "add 'int' keyword");
+        synchronize(parser);
+        return NULL;
     }
     
     if (parser->current_token.type != TOKEN_IDENTIFIER) {
-        return NULL; // Error: expected function name
+        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected function name", "add a function name");
+        synchronize(parser);
+        return NULL;
     }
     
     ASTNode* node = create_ast_node(parser, AST_FUNCTION);
@@ -89,24 +129,33 @@ static ASTNode* parse_function(Parser* parser) {
     advance_token(parser);
     
     if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-        return NULL; // Error: expected '('
+        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '('", "add opening parenthesis");
+        synchronize(parser);
+        return NULL;
     }
     
     if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-        return NULL; // Error: expected ')'
+        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
+        synchronize(parser);
+        return NULL;
     }
     
     if (!match_token(parser, TOKEN_OPEN_BRACE)) {
-        return NULL; // Error: expected '{'
+        report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
+        synchronize(parser);
+        return NULL;
     }
     
     node->data.function.statement = parse_statement(parser);
     if (!node->data.function.statement) {
-        return NULL; // Error: expected statement
+        // Error already reported by parse_statement
+        return NULL;
     }
     
     if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
-        return NULL; // Error: expected '}'
+        report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
+        synchronize(parser);
+        return NULL;
     }
     
     return node;
@@ -118,11 +167,13 @@ ASTNode* parser_parse_program(Parser* parser) {
     
     node->data.program.function = parse_function(parser);
     if (!node->data.program.function) {
-        return NULL; // Error: expected function
+        // Error already reported by parse_function
+        return NULL;
     }
     
     if (parser->current_token.type != TOKEN_EOF) {
-        return NULL; // Error: expected end of file
+        report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "expected end of file", "remove extra tokens");
+        return NULL;
     }
     
     return node;

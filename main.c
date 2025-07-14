@@ -50,8 +50,17 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  // Create error list
+  ErrorList* errors = error_list_create(arena);
+  if (!errors) {
+    printf("Error: Could not create error list\n");
+    arena_free(arena);
+    free(source);
+    return 1;
+  }
+
   // Tokenize
-  Lexer* lexer = lexer_create(arena, source);
+  Lexer* lexer = lexer_create(arena, source, input_path, errors);
   if (!lexer) {
     printf("Error: Could not create lexer\n");
     arena_free(arena);
@@ -60,7 +69,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Parse
-  Parser* parser = parser_create(arena, lexer);
+  Parser* parser = parser_create(arena, lexer, errors);
   if (!parser) {
     printf("Error: Could not create parser\n");
     arena_free(arena);
@@ -69,6 +78,15 @@ int main(int argc, char* argv[]) {
   }
 
   ASTNode* ast = parser_parse_program(parser);
+  
+  // Print errors if any occurred
+  if (error_list_has_errors(errors)) {
+    error_list_print(errors, input_path);
+    arena_free(arena);
+    free(source);
+    return 1;
+  }
+  
   if (!ast) {
     printf("Error: Parse failed\n");
     arena_free(arena);
