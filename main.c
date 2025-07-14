@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Create arena for compilation
-  Arena* arena = arena_create(1024 * 1024);  // 1MB arena
+  Arena* arena = arena_init(1024 * 1024);  // 1MB arena
   if (!arena) {
     printf("Error: Could not create arena\n");
     free(source);

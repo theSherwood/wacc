@@ -20,7 +20,7 @@ struct Arena {
   ArenaChunk* head;
 };
 
-Arena* arena_create() {
+Arena* arena_init() {
   Arena* arena = malloc(sizeof(Arena));
   arena->head = NULL;
   return arena;
