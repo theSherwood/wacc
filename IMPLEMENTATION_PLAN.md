@@ -56,7 +56,7 @@ Each step of the compiler will take an arena as its first argument. All allocati
 
 At each stage of development, we will test extensively to ensure that the changes we make are correct for both 32-bit and 64-bit WASM.
 
-Tests are in `./tests/` directory. There are subdirectories.
+Tests are in `./tests/` directory. There are subdirectories. Any new tests should be added to the appropriate subdirectory.
 
 ### `valid` and `invalid` directories
 

@@ -25,6 +25,14 @@ static void skip_whitespace(Lexer* lexer) {
     }
 }
 
+static void skip_line_comment(Lexer* lexer) {
+    // Skip the rest of the line after //
+    while (*lexer->current != '\0' && *lexer->current != '\n') {
+        lexer->current++;
+        lexer->column++;
+    }
+}
+
 static bool is_identifier_start(char c) {
     return isalpha(c) || c == '_';
 }
@@ -46,7 +54,20 @@ static TokenType get_keyword_type(const char* start, size_t length) {
 Token lexer_next_token(Lexer* lexer) {
     Token token;
     
-    skip_whitespace(lexer);
+    // Skip whitespace and comments
+    while (1) {
+        skip_whitespace(lexer);
+        
+        // Check for C99 line comment
+        if (*lexer->current == '/' && *(lexer->current + 1) == '/') {
+            lexer->current += 2;
+            lexer->column += 2;
+            skip_line_comment(lexer);
+            continue;
+        }
+        
+        break;
+    }
     
     token.start = lexer->current;
     token.line = lexer->line;
