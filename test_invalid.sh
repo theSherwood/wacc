@@ -15,15 +15,33 @@ for test_file in tests/invalid/*.c; do
         echo -n "Testing $(basename "$test_file"): "
         
         # Try to compile the test file - should fail
-        if ./wacc "$test_file" > /dev/null 2>&1; then
+        output=$(./wacc "$test_file" 2>&1)
+        exit_code=$?
+        
+        if [ $exit_code -eq 0 ]; then
             echo "FAIL - should have failed to compile"
             FAILED=$((FAILED + 1))
         else
-            echo "PASS"
-            PASSED=$((PASSED + 1))
-            
-            # TODO: Parse expected error information from comments
-            # and validate that the correct errors are reported
+            # Parse expected error information from comments
+            expected_line=$(grep "^// ERROR:" "$test_file" | head -1)
+            if [ -n "$expected_line" ]; then
+                # Extract line number and error ID from comment
+                line_num=$(echo "$expected_line" | sed 's/.*Line \([0-9]*\).*/\1/')
+                error_id=$(echo "$expected_line" | sed 's/.*Error \([0-9]*\).*/\1/')
+
+                # Check if compiler output contains expected error
+                if echo "$output" | grep -q "$error_id" && echo "$output" | grep -q ":$line_num:"; then
+                    echo "PASS"
+                    PASSED=$((PASSED + 1))
+                else
+                    echo "FAIL - expected error $error_id at line $line_num"
+                    echo "  Got: $output"
+                    FAILED=$((FAILED + 1))
+                fi
+            else
+                echo "PASS"
+                PASSED=$((PASSED + 1))
+            fi
         fi
     fi
 done
