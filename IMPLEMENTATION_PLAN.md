@@ -62,6 +62,10 @@ Tests are in `./tests/` directory. There are subdirectories.
 
 These tests cover compile-time behavior, but do not cover run-time behavior. All parser tests will consist of a code file in C. `valid` tests must parse successfully. `invalid` tests must fail to parse. `invalid` tests will include comments at the end of the file that specify the line numbers and error codes of the compiler errors. If the comments with the line numbers and error codes are missing from a test, they must be added to the test.
 
+### `runtime` directory
+
+These tests should be compiled and run. Comments at the end of the file should be used to verify the output of the C code.
+
 ## Error Handling Strategy
 
 The compiler implements a comprehensive error collection and reporting system that continues compilation through multiple errors to provide maximum feedback to the user in a single compilation pass.

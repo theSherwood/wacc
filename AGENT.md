@@ -4,6 +4,8 @@ Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it 
 
 @IR_OUTLINE.md has the plan for the intermediate representation.
 
+Don't attempt anything more than 3 times. If you can't succeed after 3 attempts, let me know so I can help.
+
 # Build Commands
 
 - `make` - Build the compiler

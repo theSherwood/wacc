@@ -1,5 +1,6 @@
 (module
-  (func $foo (result i32)
-    i32.const 42
+  (func $main (result i32)
+    i32.const 3
   )
+  (export "main" (func $main))
 )

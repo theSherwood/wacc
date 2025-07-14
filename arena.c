@@ -1,4 +1,5 @@
 #include <stdalign.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,9 +16,15 @@ typedef struct ArenaChunk {
   size_t mem[];
 } ArenaChunk;
 
-typedef struct Arena {
+struct Arena {
   ArenaChunk* head;
-} Arena;
+};
+
+Arena* arena_create() {
+  Arena* arena = malloc(sizeof(Arena));
+  arena->head = NULL;
+  return arena;
+}
 
 void* arena_alloc(Arena* arena, size_t size) {
   if (arena->head == NULL || arena->head->used + size > arena->head->capacity) {
@@ -29,7 +36,7 @@ void* arena_alloc(Arena* arena, size_t size) {
     chunk->capacity = resolved_capacity;
     arena->head = chunk;
   }
-  arena->head->used = ALIGN_UP(arena->head->used, alignof(max_align_t));
+  arena->head->used = ALIGN_UP(arena->head->used, alignof(void*));
   void* ptr = arena->head->mem + arena->head->used;
   arena->head->used += size;
   return ptr;
