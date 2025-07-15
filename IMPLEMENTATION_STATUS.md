@@ -204,9 +204,14 @@ function main() -> i32 {
 
 ## Next Steps
 
-### Step 5: Control Flow
+### Step 5: Control Flow (IN PROGRESS) 🔄
 
-- Add `if` statements and conditional execution  
+**Completed**:
+- ✅ `if` statements and conditional execution  
+- ✅ Ternary operators (`? :`)
+- ✅ Fixed execution order bugs in WASM codegen
+
+**Remaining**:
 - Implement `while` loops
 - Add block statements and scoping
 - Use structured control flow regions for WASM compatibility
