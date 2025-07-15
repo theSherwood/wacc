@@ -55,6 +55,8 @@ static ASTNode* create_ast_node(Parser* parser, ASTNodeType type) {
   ASTNode* node = arena_alloc(parser->arena, sizeof(ASTNode));
   if (!node) return NULL;
   node->type = type;
+  node->line = parser->current_token.line;
+  node->column = parser->current_token.column;
   return node;
 }
 

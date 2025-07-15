@@ -106,7 +106,7 @@ static bool analyze_expression(SemanticContext* ctx, ASTNode* expr) {
                 report_semantic_error(ctx, ERROR_SEM_UNDEFINED_VARIABLE, 
                                      "undeclared variable", 
                                      "declare the variable before using it",
-                                     1, 1);  // TODO: Get actual line/column from AST
+                                     expr->line, expr->column);
                 return false;
             }
             return true;
@@ -128,7 +128,7 @@ static bool analyze_expression(SemanticContext* ctx, ASTNode* expr) {
                 report_semantic_error(ctx, ERROR_SEM_UNDEFINED_VARIABLE, 
                                      "undeclared variable in assignment", 
                                      "declare the variable before assigning to it",
-                                     1, 1);  // TODO: Get actual line/column from AST
+                                     expr->line, expr->column);
                 return false;
             }
             
@@ -157,7 +157,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
                 report_semantic_error(ctx, ERROR_SEM_REDEFINITION, 
                                      "variable redefinition", 
                                      "use a different variable name",
-                                     1, 1);  // TODO: Get actual line/column from AST
+                                     stmt->line, stmt->column);
                 return false;
             }
             

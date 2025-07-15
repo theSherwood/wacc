@@ -160,6 +160,8 @@ typedef enum {
 
 typedef struct ASTNode {
   ASTNodeType type;
+  int line;
+  int column;
   union {
     struct {
       struct ASTNode* function;
