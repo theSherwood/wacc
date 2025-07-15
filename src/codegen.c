@@ -19,6 +19,8 @@
 #define WASM_F64_TYPE 0x7c
 
 // WASM opcodes
+#define WASM_LOCAL_GET 0x20
+#define WASM_LOCAL_SET 0x21
 #define WASM_I32_CONST 0x41
 #define WASM_I32_EQZ 0x45
 #define WASM_I32_EQ 0x46
@@ -180,6 +182,17 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
             buffer_write_leb128_i32(buf, arena, inst->operands[0].value.constant.int_value);
             break;
         }
+        case IR_LOAD_LOCAL: {
+            buffer_write_byte(buf, arena, WASM_LOCAL_GET);
+            buffer_write_leb128_u32(buf, arena, inst->operands[0].value.local_index);
+            break;
+        }
+        case IR_STORE_LOCAL: {
+            // The value to store is already on the stack from the expression evaluation
+            buffer_write_byte(buf, arena, WASM_LOCAL_SET);
+            buffer_write_leb128_u32(buf, arena, inst->operands[0].value.local_index);
+            break;
+        }
         case IR_NEG: {
             // Negate: x * -1
             buffer_write_byte(buf, arena, WASM_I32_CONST);
@@ -275,14 +288,31 @@ static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
     // Function 0 body
     Buffer func_body;
     buffer_init(&func_body, arena, 128);
-    
-    // Local declarations count
-    buffer_write_leb128_u32(&func_body, arena, 0);
-    
-    // Generate instructions
+
     IRFunction* func = &ir_module->functions[0];
+    
+    // Count local variables
+    int local_count = 0;
     for (size_t i = 0; i < func->instruction_count; i++) {
-        emit_instruction(&func_body, arena, &func->instructions[i]);
+        if (func->instructions[i].opcode == IR_ALLOCA) {
+            local_count++;
+        }
+    }
+    
+    // Local declarations: count of local variable groups
+    buffer_write_leb128_u32(&func_body, arena, local_count > 0 ? 1 : 0);
+    
+    // Declare all i32 locals in one group
+    if (local_count > 0) {
+        buffer_write_leb128_u32(&func_body, arena, local_count);
+        buffer_write_byte(&func_body, arena, WASM_I32_TYPE);
+    }
+
+    // Generate instructions
+    for (size_t i = 0; i < func->instruction_count; i++) {
+        if (func->instructions[i].opcode != IR_ALLOCA) {
+            emit_instruction(&func_body, arena, &func->instructions[i]);
+        }
     }
     
     // End instruction

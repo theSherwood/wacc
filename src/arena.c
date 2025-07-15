@@ -21,11 +21,13 @@ struct Arena {
 
 Arena* arena_init() {
   Arena* arena = malloc(sizeof(Arena));
+  if (!arena) return NULL;
   arena->head = NULL;
   return arena;
 }
 
 void* arena_alloc(Arena* arena, size_t size) {
+  if (!arena) return NULL;
   if (arena->head == NULL || arena->head->used + size > arena->head->capacity) {
     size_t resolved_capacity = size < ARENA_BLOCK_CAPACITY ? ARENA_BLOCK_CAPACITY : size;
     size_t chunk_size = sizeof(ArenaChunk) + resolved_capacity;

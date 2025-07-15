@@ -54,12 +54,14 @@ typedef struct {
 #define ERROR_SYNTAX_EXPECTED_FUNCTION     2007
 #define ERROR_SYNTAX_EXPECTED_STATEMENT    2008
 #define ERROR_SYNTAX_EXPECTED_EXPRESSION   2009
+#define ERROR_SYNTAX_MISSING_OPERATOR      2010
 
 #define ERROR_SEM_UNDEFINED_VARIABLE       3001
 #define ERROR_SEM_UNDEFINED_FUNCTION       3002
 #define ERROR_SEM_TYPE_MISMATCH            3003
 #define ERROR_SEM_REDEFINITION             3004
 #define ERROR_SEM_INVALID_ASSIGNMENT       3005
+#define ERROR_SEM_INVALID_CALL             3006
 
 #define ERROR_CODEGEN_WASM_LIMIT_EXCEEDED   4001
 #define ERROR_CODEGEN_INVALID_MEMORY_ACCESS 4002
@@ -110,6 +112,7 @@ typedef enum {
   TOKEN_STAR,        // *
   TOKEN_SLASH,       // /
   TOKEN_PERCENT,     // %
+  TOKEN_EQ,          // =
   TOKEN_EQ_EQ,       // ==
   TOKEN_BANG_EQ,     // !=
   TOKEN_LT,          // <
@@ -143,7 +146,17 @@ Lexer* lexer_create(Arena* arena, const char* source, const char* filename, Erro
 Token lexer_next_token(Lexer* lexer);
 
 // AST nodes
-typedef enum { AST_PROGRAM, AST_FUNCTION, AST_RETURN_STATEMENT, AST_INTEGER_CONSTANT, AST_UNARY_OP, AST_BINARY_OP } ASTNodeType;
+typedef enum {
+    AST_PROGRAM,
+    AST_FUNCTION,
+    AST_RETURN_STATEMENT,
+    AST_INTEGER_CONSTANT,
+    AST_UNARY_OP,
+    AST_BINARY_OP,
+    AST_VARIABLE_DECL,
+    AST_VARIABLE_REF,
+    AST_ASSIGNMENT
+} ASTNodeType;
 
 typedef struct ASTNode {
   ASTNodeType type;
@@ -153,7 +166,8 @@ typedef struct ASTNode {
     } program;
     struct {
       const char* name;
-      struct ASTNode* statement;
+      struct ASTNode** statements;
+      int statement_count;
     } function;
     struct {
       struct ASTNode* expression;
@@ -170,6 +184,17 @@ typedef struct ASTNode {
       struct ASTNode* left;
       struct ASTNode* right;
     } binary_op;
+    struct {
+      const char* name;
+      struct ASTNode* initializer;
+    } variable_decl;
+    struct {
+      const char* name;
+    } variable_ref;
+    struct {
+        const char* name;
+        struct ASTNode* value;
+    } assignment;
   } data;
 } ASTNode;
 
@@ -241,6 +266,7 @@ typedef enum {
   IR_NOT,          // !
   IR_BITWISE_NOT,  // ~
   // Memory
+  IR_ALLOCA,
   IR_LOAD_LOCAL,
   IR_STORE_LOCAL,
   // Stack operations

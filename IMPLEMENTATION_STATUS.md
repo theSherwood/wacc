@@ -99,10 +99,40 @@
 
 **Testing**: All binary operator tests pass, including precedence and mixed expressions.
 
+### Step 4: Variables and Assignment ✅
+
+**Goal**: Add support for local variable declarations and assignment
+
+**Implemented Features**:
+
+- **Lexer**: Recognizes `=` assignment operator and identifier tokens
+- **Parser**: Handles variable declarations (`int x = 5;`) and assignment statements (`x = 10;`)
+- **AST**: Added `AST_VARIABLE_DECL`, `AST_VARIABLE_REF`, and `AST_ASSIGNMENT` node types
+- **IR**: Added symbol table management, `IR_ALLOCA`, `IR_LOAD_LOCAL`, `IR_STORE_LOCAL` instructions
+- **Codegen**: Generates WASM local variables and load/store operations
+
+**Grammar Implemented**:
+
+```
+<statement> ::= <declaration> | <assignment> | "return" <exp> ";"
+<declaration> ::= "int" <id> ("=" <exp>)? ";"
+<assignment> ::= <id> "=" <exp> ";"
+<exp> ::= <assignment_exp>
+<assignment_exp> ::= <logical_or_exp> | <id> "=" <assignment_exp>
+<primary_exp> ::= <int> | <id> | "(" <exp> ")"
+```
+
+**WASM Operations**:
+- Variable declarations → `local` declarations in WASM function
+- Variable access → `local.get`
+- Variable assignment → `local.set`
+
+**Testing**: All assignment and variable tests pass, including initialization and expressions.
+
 ## Next Steps
 
-### Step 4: Variables and Assignment
+### Step 5: Control Flow
 
-- Add local variable declarations
-- Implement assignment operators
-- Add symbol table management
+- Add `if` statements and conditional execution
+- Implement `while` loops
+- Add block statements and scoping

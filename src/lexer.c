@@ -168,22 +168,7 @@ Token lexer_next_token(Lexer* lexer) {
                 lexer->current++;
                 lexer->column++;
             } else {
-                // This is a single '=' which we don't handle in this step
-                if (lexer->errors) {
-                    SourceLocation location = {
-                        .filename = lexer->filename,
-                        .line = lexer->line,
-                        .column = lexer->column - 1,
-                        .start_pos = lexer->current - lexer->source - 1,
-                        .end_pos = lexer->current - lexer->source
-                    };
-                    
-                    error_list_add(lexer->errors, NULL, 
-                                  ERROR_LEX_INVALID_CHARACTER, ERROR_LEXICAL, location, 
-                                  "unexpected character '='", "use '==' for comparison", NULL);
-                }
-                
-                token.type = TOKEN_ERROR;
+                token.type = TOKEN_EQ;
                 token.length = 1;
             }
             break;

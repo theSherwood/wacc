@@ -1,6 +1,22 @@
 #include "compiler.h"
 #include <stdio.h>
 
+// Simple symbol table for local variables
+typedef struct {
+    const char* name;
+    int index;
+    Type type;
+} Symbol;
+
+static Symbol* find_symbol(Symbol* table, int count, const char* name) {
+    for (int i = 0; i < count; i++) {
+        if (str_ncmp(table[i].name, name, str_len(name)) == 0) {
+            return &table[i];
+        }
+    }
+    return NULL;
+}
+
 static void ir_emit_instruction(IRFunction* func, Arena* arena, IROpcode opcode, Type result_type, Operand* operands, int operand_count, int result_reg) {
     if (func->instruction_count >= func->capacity) {
         func->capacity = func->capacity ? func->capacity * 2 : 16;
@@ -31,7 +47,7 @@ static Type get_i32_type() {
     return type;
 }
 
-static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr, int* reg_counter) {
+static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr, int* reg_counter, Symbol* symbol_table, int symbol_count) {
     switch (expr->type) {
         case AST_INTEGER_CONSTANT: {
             Type i32_type = get_i32_type();
@@ -43,9 +59,22 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
             ir_emit_instruction(func, arena, IR_CONST_INT, i32_type, &operand, 1, (*reg_counter)++);
             break;
         }
+        case AST_VARIABLE_REF: { // Used for variable access
+            Symbol* symbol = find_symbol(symbol_table, symbol_count, expr->data.variable_ref.name);
+            if (symbol) {
+                Operand operand;
+                operand.type = OPERAND_LOCAL;
+                operand.value_type = symbol->type;
+                operand.value.local_index = symbol->index;
+                ir_emit_instruction(func, arena, IR_LOAD_LOCAL, symbol->type, &operand, 1, (*reg_counter)++);
+            } else {
+                // Error: undefined variable handled in semantic analysis
+            }
+            break;
+        }
         case AST_UNARY_OP: {
             // Generate IR for the operand first
-            ir_generate_expression(func, arena, expr->data.unary_op.operand, reg_counter);
+            ir_generate_expression(func, arena, expr->data.unary_op.operand, reg_counter, symbol_table, symbol_count);
             
             // Get the result register of the operand
             int operand_reg = (*reg_counter) - 1;
@@ -78,11 +107,11 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
         }
         case AST_BINARY_OP: {
             // Generate IR for left operand
-            ir_generate_expression(func, arena, expr->data.binary_op.left, reg_counter);
+            ir_generate_expression(func, arena, expr->data.binary_op.left, reg_counter, symbol_table, symbol_count);
             int left_reg = (*reg_counter) - 1;
             
             // Generate IR for right operand
-            ir_generate_expression(func, arena, expr->data.binary_op.right, reg_counter);
+            ir_generate_expression(func, arena, expr->data.binary_op.right, reg_counter, symbol_table, symbol_count);
             int right_reg = (*reg_counter) - 1;
             
             Type i32_type = get_i32_type();
@@ -154,11 +183,11 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
     }
 }
 
-static void ir_generate_statement(IRFunction* func, Arena* arena, ASTNode* stmt, int* reg_counter) {
+static void ir_generate_statement(IRFunction* func, Arena* arena, ASTNode* stmt, int* reg_counter, Symbol* symbol_table, int* symbol_count, int* local_counter) {
     switch (stmt->type) {
         case AST_RETURN_STATEMENT: {
             // Generate code for the return expression
-            ir_generate_expression(func, arena, stmt->data.return_statement.expression, reg_counter);
+            ir_generate_expression(func, arena, stmt->data.return_statement.expression, reg_counter, symbol_table, *symbol_count);
             
             // Generate return instruction
             Type i32_type = get_i32_type();
@@ -168,6 +197,53 @@ static void ir_generate_statement(IRFunction* func, Arena* arena, ASTNode* stmt,
             operand.value.reg = (*reg_counter) - 1; // Use the last generated register
             
             ir_emit_instruction(func, arena, IR_RETURN, i32_type, &operand, 1, -1);
+            break;
+        }
+        case AST_VARIABLE_DECL: {
+            Type type = get_i32_type(); // Assuming all variables are i32 for now
+            ir_emit_instruction(func, arena, IR_ALLOCA, type, NULL, 0, -1); // No result register for alloca
+            
+            // Add to symbol table
+            symbol_table[*symbol_count].name = stmt->data.variable_decl.name;
+            symbol_table[*symbol_count].index = (*local_counter)++;
+            symbol_table[*symbol_count].type = type;
+            (*symbol_count)++;
+            
+            if (stmt->data.variable_decl.initializer) {
+                ir_generate_expression(func, arena, stmt->data.variable_decl.initializer, reg_counter, symbol_table, *symbol_count);
+                
+                Symbol* symbol = find_symbol(symbol_table, *symbol_count, stmt->data.variable_decl.name);
+                Operand operands[2];
+                operands[0].type = OPERAND_LOCAL;
+                operands[0].value.local_index = symbol->index;
+                operands[0].value_type = symbol->type;
+                
+                operands[1].type = OPERAND_REGISTER;
+                operands[1].value.reg = (*reg_counter) - 1;
+                operands[1].value_type = get_i32_type();
+
+                ir_emit_instruction(func, arena, IR_STORE_LOCAL, get_i32_type(), operands, 2, -1);
+            }
+            break;
+        }
+        case AST_ASSIGNMENT: {
+            ir_generate_expression(func, arena, stmt->data.assignment.value, reg_counter, symbol_table, *symbol_count);
+            
+            Symbol* symbol = find_symbol(symbol_table, *symbol_count, stmt->data.assignment.name);
+             if (symbol) {
+                Operand operands[2];
+                operands[0].type = OPERAND_LOCAL;
+                operands[0].value.local_index = symbol->index;
+                operands[0].value_type = symbol->type;
+                
+                operands[1].type = OPERAND_REGISTER;
+                operands[1].value.reg = (*reg_counter) - 1;
+                operands[1].value_type = get_i32_type();
+                
+                ir_emit_instruction(func, arena, IR_STORE_LOCAL, get_i32_type(), operands, 2, -1);
+            } else {
+                // Error: undefined variable
+            }
             break;
         }
         default:
@@ -191,10 +267,15 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
     func->capacity = 0;
     
     int reg_counter = 0;
+    int local_counter = 0;
+    Symbol symbol_table[256]; // Max 256 local variables per function
+    int symbol_count = 0;
     
     // Generate IR for the function
     ASTNode* function_node = ast->data.program.function;
-    ir_generate_statement(func, arena, function_node->data.function.statement, &reg_counter);
+    for (int i = 0; i < function_node->data.function.statement_count; i++) {
+        ir_generate_statement(func, arena, function_node->data.function.statements[i], &reg_counter, symbol_table, &symbol_count, &local_counter);
+    }
     
     return module;
 }
@@ -219,6 +300,7 @@ static const char* ir_opcode_to_string(IROpcode opcode) {
         case IR_NEG: return "neg";
         case IR_NOT: return "not";
         case IR_BITWISE_NOT: return "bitnot";
+        case IR_ALLOCA: return "alloca";
         case IR_LOAD_LOCAL: return "load_local";
         case IR_STORE_LOCAL: return "store_local";
         case IR_PUSH: return "push";

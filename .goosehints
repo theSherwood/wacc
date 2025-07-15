@@ -1,10 +1,10 @@
-Refer to @IMPLEMENTATION_PLAN.md for the implementation plan.
+Refer to ./IMPLEMENTATION_PLAN.md for the implementation plan.
 
-Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it up to date when you make changes.
+Use ./IMPLEMENTATION_STATUS.md to understand the current project status. Keep it up to date when you make changes.
 
-Refer to @IR_OUTLINE.md when changing the intermediate representation.
+Refer to ./IR_OUTLINE.md when changing the intermediate representation.
 
-Tests should be added to the `tests` directory. Tests in `tests/invalid` are for code that should fail to compile. Tests in `tests/runtime` should compile and be run.
+Tests should be added to the `tests` directory.
 
 Don't attempt anything more than 3 times. If you can't succeed after 3 attempts, let me know so I can help.
 
@@ -14,9 +14,6 @@ Don't attempt anything more than 3 times. If you can't succeed after 3 attempts,
 - `make clean` - Clean build artifacts
 - `make test` - Run the tests
 - `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wasm)
-- `./wacc --print-ast <file.c>` - Prints the AST for debugging
-- `./wacc --print-ir <file.c>` - Prints the IR for debugging
-- `./wacc <file.c> && wasm2wat out.wasm` - Prints the WAT for debugging
 
 # When writing code
 
