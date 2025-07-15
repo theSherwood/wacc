@@ -212,102 +212,189 @@ ASTNode* parser_parse_program(Parser* parser);
 // AST debugging
 void ast_print(ASTNode* ast);
 
-// IR types
-typedef enum { WASM_I32, WASM_I64, WASM_F32, WASM_F64, WASM_FUNCREF, WASM_EXTERNREF } WASMType;
-
+// IR types - WASM native types
 typedef enum {
-  TYPE_VOID,
-  TYPE_I8,
-  TYPE_I16,
-  TYPE_I32,
-  TYPE_I64,
-  TYPE_U8,
-  TYPE_U16,
-  TYPE_U32,
-  TYPE_U64,
-  TYPE_F32,
-  TYPE_F64,
-  TYPE_POINTER,
-  TYPE_ARRAY,
-  TYPE_STRUCT,
-  TYPE_FUNCTION
+    WASM_I32,
+    WASM_I64,
+    WASM_F32,
+    WASM_F64,
+    WASM_FUNCREF,
+    WASM_EXTERNREF
+} WASMType;
+
+// C99 types (for optimization and validation)
+typedef enum {
+    TYPE_VOID,
+    TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64,
+    TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64,
+    TYPE_F32, TYPE_F64,
+    TYPE_POINTER,      // Lowered to i32 (linear memory offset)
+    TYPE_ARRAY,        // Lowered to pointer + size info
+    TYPE_STRUCT,       // Lowered to multiple values or memory
+    TYPE_FUNCTION      // Lowered to function table index
 } TypeKind;
 
 typedef struct Type {
-  TypeKind kind;
-  WASMType wasm_type;
-  size_t size;
-  size_t alignment;
+    TypeKind kind;
+    WASMType wasm_type;    // Corresponding WASM type
+    size_t size;           // Size in bytes
+    size_t alignment;      // Alignment requirement
+    union {
+        struct {
+            struct Type* element_type;
+            size_t element_count;
+        } array;
+        struct {
+            struct Type* pointee_type;
+        } pointer;
+        struct {
+            struct Type* return_type;
+            struct Type* param_types;
+            size_t param_count;
+        } function;
+        struct {
+            struct Type* field_types;
+            size_t field_count;
+            size_t* field_offsets;
+        } struct_info;
+    } details;
 } Type;
 
+// IR Opcodes - Stack-based WASM-oriented instructions
 typedef enum {
-  // Constants
-  IR_CONST_INT,
-  // Control Flow
-  IR_RETURN,
-  // Arithmetic
-  IR_ADD,
-  IR_SUB,
-  IR_MUL,
-  IR_DIV,
-  IR_MOD,
-  // Comparison
-  IR_EQ,
-  IR_NE,
-  IR_LT,
-  IR_GT,
-  IR_LE,
-  IR_GE,
-  // Logical
-  IR_LOGICAL_AND,
-  IR_LOGICAL_OR,
-  // Unary operations
-  IR_NEG,          // -
-  IR_NOT,          // !
-  IR_BITWISE_NOT,  // ~
-  // Memory
-  IR_ALLOCA,
-  IR_LOAD_LOCAL,
-  IR_STORE_LOCAL,
-  // Stack operations
-  IR_PUSH,
-  IR_POP
+    // Arithmetic
+    IR_ADD, IR_SUB, IR_MUL, IR_DIV, IR_MOD,
+    IR_NEG, IR_NOT, IR_BITWISE_AND, IR_BITWISE_OR, IR_BITWISE_XOR, IR_BITWISE_NOT,
+
+    // Comparison
+    IR_EQ, IR_NE, IR_LT, IR_LE, IR_GT, IR_GE,
+
+    // Logical
+    IR_LOGICAL_AND, IR_LOGICAL_OR, IR_LOGICAL_NOT,
+
+    // Memory
+    IR_LOAD, IR_STORE, IR_LOAD_GLOBAL, IR_STORE_GLOBAL,
+    IR_ALLOCA, IR_LOAD_LOCAL, IR_STORE_LOCAL,
+    IR_STACK_SAVE, IR_STACK_RESTORE, IR_MEMCPY, IR_MEMSET,
+
+    // Control Flow
+    IR_BLOCK, IR_LOOP, IR_IF, IR_ELSE, IR_END,
+    IR_BREAK, IR_CONTINUE, IR_RETURN, IR_CALL, IR_CALL_INDIRECT,
+
+    // Constants
+    IR_CONST_INT, IR_CONST_FLOAT, IR_CONST_STRING,
+
+    // Type conversions
+    IR_CAST, IR_TRUNCATE, IR_EXTEND,
+
+    // Stack operations (for expression evaluation)
+    IR_PUSH, IR_POP, IR_DUP,
+
+    // WASM-specific
+    IR_UNREACHABLE, IR_NOP, IR_SELECT
 } IROpcode;
 
-typedef enum { OPERAND_REGISTER, OPERAND_CONSTANT, OPERAND_LOCAL } OperandType;
+// Operand types
+typedef enum {
+    OPERAND_REGISTER,     // Virtual register
+    OPERAND_CONSTANT,     // Immediate value
+    OPERAND_LOCAL,        // Local variable
+    OPERAND_GLOBAL,       // Global variable
+    OPERAND_MEMORY,       // Memory address
+    OPERAND_LABEL         // Branch target
+} OperandType;
 
 typedef struct {
-  int int_value;
-  float float_value;
+    int int_value;
+    float float_value;
 } ConstantValue;
 
 typedef struct {
-  OperandType type;
-  Type value_type;
-  union {
-    int reg;
-    ConstantValue constant;
-    int local_index;
-  } value;
+    OperandType type;
+    Type value_type;
+    union {
+        int reg;              // Virtual register number
+        ConstantValue constant;
+        int local_index;
+        int global_index;
+        int memory_offset;
+        int label_id;
+    } value;
 } Operand;
 
+// Stack-based instruction
 typedef struct {
-  IROpcode opcode;
-  Type result_type;
-  Operand operands[3];
-  int operand_count;
-  int result_reg;
+    IROpcode opcode;
+    Type result_type;
+    Operand operands[3];  // Maximum 3 operands
+    int operand_count;
+    int result_reg;       // Virtual register for result (-1 if stack-based)
 } Instruction;
 
-typedef struct {
-  Instruction* instructions;
-  size_t instruction_count;
-  size_t capacity;
-} IRFunction;
+// Structured control flow regions
+typedef enum {
+    REGION_BLOCK,      // Linear sequence of instructions
+    REGION_LOOP,       // Loop construct
+    REGION_IF,         // If-then-else construct
+    REGION_FUNCTION    // Function body
+} RegionType;
 
+typedef struct Region {
+    RegionType type;
+    int id;
+    Instruction* instructions;
+    size_t instruction_count;
+    size_t instruction_capacity;
+    struct Region** children;    // Nested regions
+    size_t child_count;
+    size_t child_capacity;
+    struct Region* parent;       // Parent region
+
+    // For control flow
+    union {
+        struct {
+            struct Region* then_region;
+            struct Region* else_region;
+        } if_data;
+        struct {
+            struct Region* body;
+        } loop_data;
+    } data;
+} Region;
+
+// Local variable
 typedef struct {
-  IRFunction* functions;
-  size_t function_count;
+    const char* name;
+    Type type;
+    int index;
+    bool is_stack_based;  // True if allocated on simulated stack vs WASM local
+} LocalVariable;
+
+// Function parameter
+typedef struct {
+    const char* name;
+    Type type;
+    int index;
+} Parameter;
+
+// IR Function with structured regions
+typedef struct {
+    const char* name;
+    Type return_type;
+    Parameter* parameters;
+    size_t param_count;
+    Region* body;                // Function body as root region
+    LocalVariable* locals;
+    size_t local_count;
+    size_t local_capacity;
+    int max_stack_size;          // For stack simulation
+} Function;
+
+// IR Module
+typedef struct {
+    Function* functions;
+    size_t function_count;
+    size_t function_capacity;
 } IRModule;
 
 // IR generation

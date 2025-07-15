@@ -129,10 +129,56 @@
 
 **Testing**: All assignment and variable tests pass, including initialization and expressions.
 
+### Step 4.5: IR System Rewrite ✅ (CRITICAL BUGFIX)
+
+**Goal**: Fix the broken register-based IR system to use proper stack-based WASM semantics
+
+**Fixed Issues**:
+
+- **Critical Bug**: Old IR used registers but WASM is stack-based - complete mismatch causing wrong code generation
+- **IR Structure**: Replaced simple instruction list with structured control flow regions for WASM compatibility
+- **Stack-based Evaluation**: All operations now use WASM's evaluation stack instead of virtual registers
+- **Symbol Tables**: Added proper scoped symbol table management
+- **Memory Model**: Prepared for WASM linear memory model with local variables
+
+**New IR Features**:
+
+- **Stack-based Instructions**: All operations push/pop from evaluation stack matching WASM semantics
+- **Structured Regions**: Hierarchical control flow (function, block, loop, if) for WASM structured control flow
+- **Type System**: Complete C99 to WASM type mapping with proper WASM native types
+- **Local Variables**: Proper WASM local variable management with index tracking
+- **Symbol Scoping**: Nested symbol tables for proper variable scoping
+
+**IR Design**: 
+- Follows IR_OUTLINE.md design exactly
+- Stack-based evaluation matching WASM semantics
+- Structured control flow regions instead of basic blocks
+- Proper type system with C99 to WASM mapping
+- Scoped symbol tables for variables
+
+**Generated IR Example**:
+```
+function main() -> i32 {
+  locals: $0:x, $1:y
+  function:
+    const.i32 5
+    local.set $0
+    const.i32 10
+    local.set $1
+    local.get $0
+    local.get $1
+    i32.add
+    return
+}
+```
+
+**Testing**: All 44 tests pass with new stack-based IR system.
+
 ## Next Steps
 
 ### Step 5: Control Flow
 
-- Add `if` statements and conditional execution
+- Add `if` statements and conditional execution  
 - Implement `while` loops
 - Add block statements and scoping
+- Use structured control flow regions for WASM compatibility

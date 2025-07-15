@@ -1,45 +1,27 @@
 #include "compiler.h"
 #include <stdio.h>
 
-// Simple symbol table for local variables
-typedef struct {
-    const char* name;
-    int index;
-    Type type;
-} Symbol;
+// Symbol table for scoped variable lookup
+typedef struct SymbolTable {
+    LocalVariable* variables;
+    size_t count;
+    size_t capacity;
+    struct SymbolTable* parent;  // For nested scopes
+} SymbolTable;
 
-static Symbol* find_symbol(Symbol* table, int count, const char* name) {
-    for (int i = 0; i < count; i++) {
-        if (str_ncmp(table[i].name, name, str_len(name)) == 0) {
-            return &table[i];
-        }
-    }
-    return NULL;
-}
+// IR Generation context
+typedef struct IRContext {
+    Arena* arena;
+    Function* current_function;
+    Region* current_region;
+    SymbolTable* current_scope;
+    int next_register;
+    int next_region_id;
+} IRContext;
 
-static void ir_emit_instruction(IRFunction* func, Arena* arena, IROpcode opcode, Type result_type, Operand* operands, int operand_count, int result_reg) {
-    if (func->instruction_count >= func->capacity) {
-        func->capacity = func->capacity ? func->capacity * 2 : 16;
-        Instruction* new_instructions = arena_alloc(arena, func->capacity * sizeof(Instruction));
-        if (func->instructions) {
-            mem_cpy(new_instructions, func->instructions, func->instruction_count * sizeof(Instruction));
-        }
-        func->instructions = new_instructions;
-    }
-    
-    Instruction* inst = &func->instructions[func->instruction_count++];
-    inst->opcode = opcode;
-    inst->result_type = result_type;
-    inst->operand_count = operand_count;
-    inst->result_reg = result_reg;
-    
-    for (int i = 0; i < operand_count; i++) {
-        inst->operands[i] = operands[i];
-    }
-}
-
-static Type get_i32_type() {
-    Type type;
+// Helper functions for type creation
+static Type create_i32_type() {
+    Type type = {0};
     type.kind = TYPE_I32;
     type.wasm_type = WASM_I32;
     type.size = 4;
@@ -47,45 +29,147 @@ static Type get_i32_type() {
     return type;
 }
 
-static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr, int* reg_counter, Symbol* symbol_table, int symbol_count) {
+static Type create_void_type() {
+    Type type = {0};
+    type.kind = TYPE_VOID;
+    type.wasm_type = WASM_I32;  // WASM doesn't have void, use i32
+    type.size = 0;
+    type.alignment = 1;
+    return type;
+}
+
+// Symbol table operations
+static SymbolTable* symbol_table_create(Arena* arena, SymbolTable* parent) {
+    SymbolTable* table = arena_alloc(arena, sizeof(SymbolTable));
+    table->variables = NULL;
+    table->count = 0;
+    table->capacity = 0;
+    table->parent = parent;
+    return table;
+}
+
+static LocalVariable* symbol_table_find(SymbolTable* table, const char* name) {
+    // Search current scope first
+    for (size_t i = 0; i < table->count; i++) {
+        if (str_ncmp(table->variables[i].name, name, str_len(name)) == 0 &&
+            str_len(table->variables[i].name) == str_len(name)) {
+            return &table->variables[i];
+        }
+    }
+    
+    // Search parent scopes
+    if (table->parent) {
+        return symbol_table_find(table->parent, name);
+    }
+    
+    return NULL;
+}
+
+static void symbol_table_add(Arena* arena, SymbolTable* table, const char* name, Type type, int index, bool is_stack_based) {
+    if (table->count >= table->capacity) {
+        table->capacity = table->capacity ? table->capacity * 2 : 8;
+        LocalVariable* new_vars = arena_alloc(arena, table->capacity * sizeof(LocalVariable));
+        if (table->variables) {
+            mem_cpy(new_vars, table->variables, table->count * sizeof(LocalVariable));
+        }
+        table->variables = new_vars;
+    }
+    
+    table->variables[table->count].name = name;
+    table->variables[table->count].type = type;
+    table->variables[table->count].index = index;
+    table->variables[table->count].is_stack_based = is_stack_based;
+    table->count++;
+}
+
+// Region operations
+static Region* region_create(Arena* arena, RegionType type, int id, Region* parent) {
+    Region* region = arena_alloc(arena, sizeof(Region));
+    region->type = type;
+    region->id = id;
+    region->instructions = NULL;
+    region->instruction_count = 0;
+    region->instruction_capacity = 0;
+    region->children = NULL;
+    region->child_count = 0;
+    region->child_capacity = 0;
+    region->parent = parent;
+    return region;
+}
+
+static void region_add_instruction(Arena* arena, Region* region, Instruction inst) {
+    if (region->instruction_count >= region->instruction_capacity) {
+        region->instruction_capacity = region->instruction_capacity ? region->instruction_capacity * 2 : 16;
+        Instruction* new_instructions = arena_alloc(arena, region->instruction_capacity * sizeof(Instruction));
+        if (region->instructions) {
+            mem_cpy(new_instructions, region->instructions, region->instruction_count * sizeof(Instruction));
+        }
+        region->instructions = new_instructions;
+    }
+    
+    region->instructions[region->instruction_count++] = inst;
+}
+
+static void region_add_child(Arena* arena, Region* parent, Region* child) {
+    if (parent->child_count >= parent->child_capacity) {
+        parent->child_capacity = parent->child_capacity ? parent->child_capacity * 2 : 4;
+        Region** new_children = arena_alloc(arena, parent->child_capacity * sizeof(Region*));
+        if (parent->children) {
+            mem_cpy(new_children, parent->children, parent->child_count * sizeof(Region*));
+        }
+        parent->children = new_children;
+    }
+    
+    parent->children[parent->child_count++] = child;
+    child->parent = parent;
+}
+
+// Stack-based instruction emission
+static void emit_instruction(IRContext* ctx, IROpcode opcode, Type result_type, Operand* operands, int operand_count) {
+    Instruction inst = {0};
+    inst.opcode = opcode;
+    inst.result_type = result_type;
+    inst.operand_count = operand_count;
+    inst.result_reg = -1;  // Stack-based, no register assignment
+    
+    for (int i = 0; i < operand_count && i < 3; i++) {
+        inst.operands[i] = operands[i];
+    }
+    
+    region_add_instruction(ctx->arena, ctx->current_region, inst);
+}
+
+// Expression generation - generates stack-based operations
+static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
     switch (expr->type) {
         case AST_INTEGER_CONSTANT: {
-            Type i32_type = get_i32_type();
-            Operand operand;
+            Operand operand = {0};
             operand.type = OPERAND_CONSTANT;
-            operand.value_type = i32_type;
+            operand.value_type = create_i32_type();
             operand.value.constant.int_value = expr->data.integer_constant.value;
             
-            ir_emit_instruction(func, arena, IR_CONST_INT, i32_type, &operand, 1, (*reg_counter)++);
+            emit_instruction(ctx, IR_CONST_INT, create_i32_type(), &operand, 1);
             break;
         }
-        case AST_VARIABLE_REF: { // Used for variable access
-            Symbol* symbol = find_symbol(symbol_table, symbol_count, expr->data.variable_ref.name);
-            if (symbol) {
-                Operand operand;
+        
+        case AST_VARIABLE_REF: {
+            LocalVariable* var = symbol_table_find(ctx->current_scope, expr->data.variable_ref.name);
+            if (var) {
+                Operand operand = {0};
                 operand.type = OPERAND_LOCAL;
-                operand.value_type = symbol->type;
-                operand.value.local_index = symbol->index;
-                ir_emit_instruction(func, arena, IR_LOAD_LOCAL, symbol->type, &operand, 1, (*reg_counter)++);
-            } else {
-                // Error: undefined variable handled in semantic analysis
+                operand.value_type = var->type;
+                operand.value.local_index = var->index;
+                
+                emit_instruction(ctx, IR_LOAD_LOCAL, var->type, &operand, 1);
             }
             break;
         }
+        
         case AST_UNARY_OP: {
-            // Generate IR for the operand first
-            ir_generate_expression(func, arena, expr->data.unary_op.operand, reg_counter, symbol_table, symbol_count);
+            // Generate operand first (pushes value to stack)
+            ir_generate_expression(ctx, expr->data.unary_op.operand);
             
-            // Get the result register of the operand
-            int operand_reg = (*reg_counter) - 1;
-            
-            Type i32_type = get_i32_type();
-            Operand operand;
-            operand.type = OPERAND_REGISTER;
-            operand.value_type = i32_type;
-            operand.value.reg = operand_reg;
-            
-            // Choose the appropriate IR opcode based on the operator
+            // Emit unary operation (pops operand, pushes result)
             IROpcode opcode;
             switch (expr->data.unary_op.operator) {
                 case TOKEN_MINUS:
@@ -98,36 +182,21 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
                     opcode = IR_BITWISE_NOT;
                     break;
                 default:
-                    // Should not happen
                     return;
             }
             
-            ir_emit_instruction(func, arena, opcode, i32_type, &operand, 1, (*reg_counter)++);
+            emit_instruction(ctx, opcode, create_i32_type(), NULL, 0);
             break;
         }
+        
         case AST_BINARY_OP: {
-            // Generate IR for left operand
-            ir_generate_expression(func, arena, expr->data.binary_op.left, reg_counter, symbol_table, symbol_count);
-            int left_reg = (*reg_counter) - 1;
+            // Generate left operand (pushes to stack)
+            ir_generate_expression(ctx, expr->data.binary_op.left);
             
-            // Generate IR for right operand
-            ir_generate_expression(func, arena, expr->data.binary_op.right, reg_counter, symbol_table, symbol_count);
-            int right_reg = (*reg_counter) - 1;
+            // Generate right operand (pushes to stack)
+            ir_generate_expression(ctx, expr->data.binary_op.right);
             
-            Type i32_type = get_i32_type();
-            Operand operands[2];
-            
-            // Left operand
-            operands[0].type = OPERAND_REGISTER;
-            operands[0].value_type = i32_type;
-            operands[0].value.reg = left_reg;
-            
-            // Right operand
-            operands[1].type = OPERAND_REGISTER;
-            operands[1].value_type = i32_type;
-            operands[1].value.reg = right_reg;
-            
-            // Choose the appropriate IR opcode based on the operator
+            // Emit binary operation (pops two operands, pushes result)
             IROpcode opcode;
             switch (expr->data.binary_op.operator) {
                 case TOKEN_PLUS:
@@ -170,141 +239,188 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
                     opcode = IR_LOGICAL_OR;
                     break;
                 default:
-                    // Should not happen
                     return;
             }
             
-            ir_emit_instruction(func, arena, opcode, i32_type, operands, 2, (*reg_counter)++);
+            emit_instruction(ctx, opcode, create_i32_type(), NULL, 0);
             break;
         }
+        
+        case AST_ASSIGNMENT: {
+            // Generate the value expression (pushes to stack)
+            ir_generate_expression(ctx, expr->data.assignment.value);
+            
+            // Find the variable
+            LocalVariable* var = symbol_table_find(ctx->current_scope, expr->data.assignment.name);
+            if (var) {
+                Operand operands[2];
+                
+                // First operand: local variable index
+                operands[0].type = OPERAND_LOCAL;
+                operands[0].value_type = var->type;
+                operands[0].value.local_index = var->index;
+                
+                // Store instruction (pops value from stack, stores in local)
+                emit_instruction(ctx, IR_STORE_LOCAL, var->type, operands, 1);
+                
+                // Push the stored value back to stack (assignment returns the value)
+                emit_instruction(ctx, IR_LOAD_LOCAL, var->type, operands, 1);
+            }
+            break;
+        }
+        
         default:
-            // Handle other expression types later
             break;
     }
 }
 
-static void ir_generate_statement(IRFunction* func, Arena* arena, ASTNode* stmt, int* reg_counter, Symbol* symbol_table, int* symbol_count, int* local_counter) {
+// Statement generation
+static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     switch (stmt->type) {
         case AST_RETURN_STATEMENT: {
-            // Generate code for the return expression
-            ir_generate_expression(func, arena, stmt->data.return_statement.expression, reg_counter, symbol_table, *symbol_count);
+            // Generate the return expression (pushes value to stack)
+            ir_generate_expression(ctx, stmt->data.return_statement.expression);
             
-            // Generate return instruction
-            Type i32_type = get_i32_type();
-            Operand operand;
-            operand.type = OPERAND_REGISTER;
-            operand.value_type = i32_type;
-            operand.value.reg = (*reg_counter) - 1; // Use the last generated register
-            
-            ir_emit_instruction(func, arena, IR_RETURN, i32_type, &operand, 1, -1);
+            // Emit return instruction (pops value from stack and returns it)
+            emit_instruction(ctx, IR_RETURN, create_i32_type(), NULL, 0);
             break;
         }
+        
         case AST_VARIABLE_DECL: {
-            Type type = get_i32_type(); // Assuming all variables are i32 for now
-            ir_emit_instruction(func, arena, IR_ALLOCA, type, NULL, 0, -1); // No result register for alloca
+            Type var_type = create_i32_type();  // Assuming all vars are i32 for now
+            
+            // Add variable to function locals
+            Function* func = ctx->current_function;
+            if (func->local_count >= func->local_capacity) {
+                func->local_capacity = func->local_capacity ? func->local_capacity * 2 : 8;
+                LocalVariable* new_locals = arena_alloc(ctx->arena, func->local_capacity * sizeof(LocalVariable));
+                if (func->locals) {
+                    mem_cpy(new_locals, func->locals, func->local_count * sizeof(LocalVariable));
+                }
+                func->locals = new_locals;
+            }
+            
+            int local_index = func->local_count;
+            func->locals[func->local_count].name = stmt->data.variable_decl.name;
+            func->locals[func->local_count].type = var_type;
+            func->locals[func->local_count].index = local_index;
+            func->locals[func->local_count].is_stack_based = false;  // Use WASM local for now
+            func->local_count++;
             
             // Add to symbol table
-            symbol_table[*symbol_count].name = stmt->data.variable_decl.name;
-            symbol_table[*symbol_count].index = (*local_counter)++;
-            symbol_table[*symbol_count].type = type;
-            (*symbol_count)++;
+            symbol_table_add(ctx->arena, ctx->current_scope, stmt->data.variable_decl.name, var_type, local_index, false);
             
+            // Handle initializer if present
             if (stmt->data.variable_decl.initializer) {
-                ir_generate_expression(func, arena, stmt->data.variable_decl.initializer, reg_counter, symbol_table, *symbol_count);
+                // Generate initializer expression (pushes value to stack)
+                ir_generate_expression(ctx, stmt->data.variable_decl.initializer);
                 
-                Symbol* symbol = find_symbol(symbol_table, *symbol_count, stmt->data.variable_decl.name);
-                Operand operands[2];
-                operands[0].type = OPERAND_LOCAL;
-                operands[0].value.local_index = symbol->index;
-                operands[0].value_type = symbol->type;
+                // Store in local variable (pops value from stack)
+                Operand operand = {0};
+                operand.type = OPERAND_LOCAL;
+                operand.value_type = var_type;
+                operand.value.local_index = local_index;
                 
-                operands[1].type = OPERAND_REGISTER;
-                operands[1].value.reg = (*reg_counter) - 1;
-                operands[1].value_type = get_i32_type();
-
-                ir_emit_instruction(func, arena, IR_STORE_LOCAL, get_i32_type(), operands, 2, -1);
+                emit_instruction(ctx, IR_STORE_LOCAL, var_type, &operand, 1);
             }
             break;
         }
+        
         case AST_ASSIGNMENT: {
-            ir_generate_expression(func, arena, stmt->data.assignment.value, reg_counter, symbol_table, *symbol_count);
+            // Generate the assignment expression
+            ir_generate_expression(ctx, stmt);
             
-            Symbol* symbol = find_symbol(symbol_table, *symbol_count, stmt->data.assignment.name);
-             if (symbol) {
-                Operand operands[2];
-                operands[0].type = OPERAND_LOCAL;
-                operands[0].value.local_index = symbol->index;
-                operands[0].value_type = symbol->type;
-                
-                operands[1].type = OPERAND_REGISTER;
-                operands[1].value.reg = (*reg_counter) - 1;
-                operands[1].value_type = get_i32_type();
-                
-                ir_emit_instruction(func, arena, IR_STORE_LOCAL, get_i32_type(), operands, 2, -1);
-            } else {
-                // Error: undefined variable
-            }
+            // Pop the result (we don't need it for statement context)
+            emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
             break;
         }
+        
         default:
-            // Handle other statement types later
             break;
     }
 }
 
+// Main IR generation function
 IRModule* ir_generate(Arena* arena, ASTNode* ast) {
     if (!ast || ast->type != AST_PROGRAM) {
         return NULL;
     }
     
     IRModule* module = arena_alloc(arena, sizeof(IRModule));
-    module->function_count = 1;
-    module->functions = arena_alloc(arena, sizeof(IRFunction));
+    module->functions = NULL;
+    module->function_count = 0;
+    module->function_capacity = 0;
     
-    IRFunction* func = &module->functions[0];
-    func->instructions = NULL;
-    func->instruction_count = 0;
-    func->capacity = 0;
+    // Create IR context
+    IRContext ctx = {0};
+    ctx.arena = arena;
+    ctx.next_register = 0;
+    ctx.next_region_id = 0;
     
-    int reg_counter = 0;
-    int local_counter = 0;
-    Symbol symbol_table[256]; // Max 256 local variables per function
-    int symbol_count = 0;
-    
-    // Generate IR for the function
+    // Process the function
     ASTNode* function_node = ast->data.program.function;
+    
+    // Allocate function
+    if (module->function_count >= module->function_capacity) {
+        module->function_capacity = 4;
+        module->functions = arena_alloc(arena, module->function_capacity * sizeof(Function));
+    }
+    
+    Function* func = &module->functions[module->function_count++];
+    func->name = function_node->data.function.name;
+    func->return_type = create_i32_type();
+    func->parameters = NULL;
+    func->param_count = 0;
+    func->locals = NULL;
+    func->local_count = 0;
+    func->local_capacity = 0;
+    func->max_stack_size = 0;
+    
+    // Create function body region
+    func->body = region_create(arena, REGION_FUNCTION, ctx.next_region_id++, NULL);
+    
+    // Set context
+    ctx.current_function = func;
+    ctx.current_region = func->body;
+    ctx.current_scope = symbol_table_create(arena, NULL);
+    
+    // Generate IR for all statements
     for (int i = 0; i < function_node->data.function.statement_count; i++) {
-        ir_generate_statement(func, arena, function_node->data.function.statements[i], &reg_counter, symbol_table, &symbol_count, &local_counter);
+        ir_generate_statement(&ctx, function_node->data.function.statements[i]);
     }
     
     return module;
 }
 
+// IR printing functions
 static const char* ir_opcode_to_string(IROpcode opcode) {
     switch (opcode) {
-        case IR_CONST_INT: return "const_int";
+        case IR_CONST_INT: return "const.i32";
+        case IR_ADD: return "i32.add";
+        case IR_SUB: return "i32.sub";
+        case IR_MUL: return "i32.mul";
+        case IR_DIV: return "i32.div_s";
+        case IR_MOD: return "i32.rem_s";
+        case IR_NEG: return "i32.neg";
+        case IR_NOT: return "i32.eqz";
+        case IR_BITWISE_NOT: return "i32.xor";
+        case IR_EQ: return "i32.eq";
+        case IR_NE: return "i32.ne";
+        case IR_LT: return "i32.lt_s";
+        case IR_GT: return "i32.gt_s";
+        case IR_LE: return "i32.le_s";
+        case IR_GE: return "i32.ge_s";
+        case IR_LOGICAL_AND: return "i32.and";
+        case IR_LOGICAL_OR: return "i32.or";
+        case IR_LOAD_LOCAL: return "local.get";
+        case IR_STORE_LOCAL: return "local.set";
         case IR_RETURN: return "return";
-        case IR_ADD: return "add";
-        case IR_SUB: return "sub";
-        case IR_MUL: return "mul";
-        case IR_DIV: return "div";
-        case IR_MOD: return "mod";
-        case IR_EQ: return "eq";
-        case IR_NE: return "ne";
-        case IR_LT: return "lt";
-        case IR_GT: return "gt";
-        case IR_LE: return "le";
-        case IR_GE: return "ge";
-        case IR_LOGICAL_AND: return "and";
-        case IR_LOGICAL_OR: return "or";
-        case IR_NEG: return "neg";
-        case IR_NOT: return "not";
-        case IR_BITWISE_NOT: return "bitnot";
-        case IR_ALLOCA: return "alloca";
-        case IR_LOAD_LOCAL: return "load_local";
-        case IR_STORE_LOCAL: return "store_local";
-        case IR_PUSH: return "push";
-        case IR_POP: return "pop";
+        case IR_POP: return "drop";
+        case IR_BLOCK: return "block";
+        case IR_LOOP: return "loop";
+        case IR_IF: return "if";
+        case IR_ELSE: return "else";
+        case IR_END: return "end";
         default: return "unknown";
     }
 }
@@ -318,26 +434,66 @@ static void ir_print_operand(Operand* operand) {
             printf("%d", operand->value.constant.int_value);
             break;
         case OPERAND_LOCAL:
-            printf("local%d", operand->value.local_index);
+            printf("$%d", operand->value.local_index);
+            break;
+        case OPERAND_GLOBAL:
+            printf("g%d", operand->value.global_index);
+            break;
+        case OPERAND_MEMORY:
+            printf("mem[%d]", operand->value.memory_offset);
+            break;
+        case OPERAND_LABEL:
+            printf("label%d", operand->value.label_id);
             break;
     }
 }
 
-static void ir_print_instruction(Instruction* inst) {
-    printf("  ");
-    
-    if (inst->result_reg >= 0) {
-        printf("r%d = ", inst->result_reg);
+static void ir_print_instruction(Instruction* inst, int indent) {
+    for (int i = 0; i < indent; i++) {
+        printf("  ");
     }
     
     printf("%s", ir_opcode_to_string(inst->opcode));
     
     for (int i = 0; i < inst->operand_count; i++) {
-        printf(i == 0 ? " " : ", ");
+        printf(" ");
         ir_print_operand(&inst->operands[i]);
     }
     
     printf("\n");
+}
+
+static void ir_print_region(Region* region, int indent) {
+    if (!region) return;
+    
+    for (int i = 0; i < indent; i++) {
+        printf("  ");
+    }
+    
+    switch (region->type) {
+        case REGION_FUNCTION:
+            printf("function:\n");
+            break;
+        case REGION_BLOCK:
+            printf("block:\n");
+            break;
+        case REGION_LOOP:
+            printf("loop:\n");
+            break;
+        case REGION_IF:
+            printf("if:\n");
+            break;
+    }
+    
+    // Print instructions
+    for (size_t i = 0; i < region->instruction_count; i++) {
+        ir_print_instruction(&region->instructions[i], indent + 1);
+    }
+    
+    // Print children
+    for (size_t i = 0; i < region->child_count; i++) {
+        ir_print_region(region->children[i], indent + 1);
+    }
 }
 
 void ir_print(IRModule* ir_module) {
@@ -346,18 +502,36 @@ void ir_print(IRModule* ir_module) {
         return;
     }
     
-    printf("=== IR ===\n");
+    printf("=== IR (Stack-based) ===\n");
     
     for (size_t i = 0; i < ir_module->function_count; i++) {
-        IRFunction* func = &ir_module->functions[i];
-        printf("function%zu:\n", i);
+        Function* func = &ir_module->functions[i];
+        printf("function %s(", func->name ? func->name : "anonymous");
         
-        for (size_t j = 0; j < func->instruction_count; j++) {
-            ir_print_instruction(&func->instructions[j]);
+        for (size_t j = 0; j < func->param_count; j++) {
+            if (j > 0) printf(", ");
+            printf("$%d", func->parameters[j].index);
         }
         
+        printf(") -> ");
+        printf("i32");  // Assuming return type is i32
+        printf(" {\n");
+        
+        // Print locals
+        printf("  locals: ");
+        for (size_t j = 0; j < func->local_count; j++) {
+            if (j > 0) printf(", ");
+            printf("$%d:%s", func->locals[j].index, func->locals[j].name);
+        }
         printf("\n");
+        
+        // Print function body
+        if (func->body) {
+            ir_print_region(func->body, 1);
+        }
+        
+        printf("}\n\n");
     }
     
-    printf("==========\n");
+    printf("======================\n");
 }

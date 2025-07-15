@@ -278,51 +278,58 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
     }
 }
 
+static void emit_region(Buffer* buf, Arena* arena, Region* region) {
+    if (!region) return;
+    
+    // Emit instructions in this region
+    for (size_t i = 0; i < region->instruction_count; i++) {
+        emit_instruction(buf, arena, &region->instructions[i]);
+    }
+    
+    // Emit child regions
+    for (size_t i = 0; i < region->child_count; i++) {
+        emit_region(buf, arena, region->children[i]);
+    }
+}
+
 static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
     Buffer content;
     buffer_init(&content, arena, 256);
     
     // Number of functions
-    buffer_write_leb128_u32(&content, arena, 1);
+    buffer_write_leb128_u32(&content, arena, ir_module->function_count);
     
-    // Function 0 body
-    Buffer func_body;
-    buffer_init(&func_body, arena, 128);
-
-    IRFunction* func = &ir_module->functions[0];
-    
-    // Count local variables
-    int local_count = 0;
-    for (size_t i = 0; i < func->instruction_count; i++) {
-        if (func->instructions[i].opcode == IR_ALLOCA) {
-            local_count++;
+    // Process each function
+    for (size_t func_idx = 0; func_idx < ir_module->function_count; func_idx++) {
+        Function* func = &ir_module->functions[func_idx];
+        
+        // Function body
+        Buffer func_body;
+        buffer_init(&func_body, arena, 128);
+        
+        // Local declarations: count of local variable groups
+        buffer_write_leb128_u32(&func_body, arena, func->local_count > 0 ? 1 : 0);
+        
+        // Declare all i32 locals in one group
+        if (func->local_count > 0) {
+            buffer_write_leb128_u32(&func_body, arena, func->local_count);
+            buffer_write_byte(&func_body, arena, WASM_I32_TYPE);
         }
-    }
-    
-    // Local declarations: count of local variable groups
-    buffer_write_leb128_u32(&func_body, arena, local_count > 0 ? 1 : 0);
-    
-    // Declare all i32 locals in one group
-    if (local_count > 0) {
-        buffer_write_leb128_u32(&func_body, arena, local_count);
-        buffer_write_byte(&func_body, arena, WASM_I32_TYPE);
-    }
 
-    // Generate instructions
-    for (size_t i = 0; i < func->instruction_count; i++) {
-        if (func->instructions[i].opcode != IR_ALLOCA) {
-            emit_instruction(&func_body, arena, &func->instructions[i]);
+        // Generate instructions from structured regions
+        if (func->body) {
+            emit_region(&func_body, arena, func->body);
         }
+        
+        // End instruction
+        buffer_write_byte(&func_body, arena, WASM_END);
+        
+        // Write function body size and body
+        buffer_write_leb128_u32(&content, arena, (uint32_t)func_body.size);
+        buffer_ensure_capacity(&content, arena, func_body.size);
+        mem_cpy(content.data + content.size, func_body.data, func_body.size);
+        content.size += func_body.size;
     }
-    
-    // End instruction
-    buffer_write_byte(&func_body, arena, WASM_END);
-    
-    // Write function body size and body
-    buffer_write_leb128_u32(&content, arena, (uint32_t)func_body.size);
-    buffer_ensure_capacity(&content, arena, func_body.size);
-    mem_cpy(content.data + content.size, func_body.data, func_body.size);
-    content.size += func_body.size;
     
     emit_section_header(buf, arena, SECTION_CODE, content.size);
     buffer_ensure_capacity(buf, arena, content.size);
