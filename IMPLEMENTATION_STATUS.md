@@ -212,6 +212,6 @@ function main() -> i32 {
 - ✅ Fixed execution order bugs in WASM codegen
 
 **Remaining**:
-- Implement `while` loops
 - Add block statements and scoping
+- Implement `while` loops
 - Use structured control flow regions for WASM compatibility

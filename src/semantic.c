@@ -176,6 +176,54 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
             return analyze_expression(ctx, stmt);
         }
         
+        case AST_COMPOUND_STATEMENT: {
+            // Create a new scope for the compound statement
+            SymbolTable* previous_scope = ctx->current_scope;
+            ctx->current_scope = symbol_table_create(ctx->arena, previous_scope);
+            
+            if (!ctx->current_scope) {
+                ctx->current_scope = previous_scope;
+                return false;
+            }
+            
+            bool success = true;
+            
+            // Analyze all statements in the compound statement
+            for (int i = 0; i < stmt->data.compound_statement.statement_count; i++) {
+                if (!analyze_statement(ctx, stmt->data.compound_statement.statements[i])) {
+                    success = false;
+                    // Continue analyzing other statements to collect all errors
+                }
+            }
+            
+            // Restore the previous scope
+            ctx->current_scope = previous_scope;
+            
+            return success;
+        }
+        
+        case AST_IF_STATEMENT: {
+            bool success = true;
+            
+            // Analyze the condition
+            if (!analyze_expression(ctx, stmt->data.if_statement.condition)) {
+                success = false;
+            }
+            
+            // Analyze the then statement
+            if (!analyze_statement(ctx, stmt->data.if_statement.then_statement)) {
+                success = false;
+            }
+            
+            // Analyze the else statement if present
+            if (stmt->data.if_statement.else_statement && 
+                !analyze_statement(ctx, stmt->data.if_statement.else_statement)) {
+                success = false;
+            }
+            
+            return success;
+        }
+        
         default:
             // Other statement types (like expression statements) 
             return analyze_expression(ctx, stmt);

@@ -161,7 +161,8 @@ typedef enum {
     AST_VARIABLE_REF,
     AST_ASSIGNMENT,
     AST_IF_STATEMENT,
-    AST_TERNARY_EXPRESSION
+    AST_TERNARY_EXPRESSION,
+    AST_COMPOUND_STATEMENT
 } ASTNodeType;
 
 typedef struct ASTNode {
@@ -213,6 +214,10 @@ typedef struct ASTNode {
         struct ASTNode* true_expression;
         struct ASTNode* false_expression;
     } ternary_expression;
+    struct {
+        struct ASTNode** statements;
+        int statement_count;
+    } compound_statement;
   } data;
 } ASTNode;
 

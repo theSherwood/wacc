@@ -329,6 +329,13 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
         }
         
         case AST_VARIABLE_DECL: {
+            // Create a block region for the variable declaration to maintain order
+            Region* decl_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, decl_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = decl_region;
+            
             Type var_type = create_i32_type();  // Assuming all vars are i32 for now
             
             // Add variable to function locals
@@ -365,24 +372,44 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
                 
                 emit_instruction(ctx, IR_STORE_LOCAL, var_type, &operand, 1);
             }
+            
+            ctx->current_region = old_region;
             break;
         }
         
         case AST_ASSIGNMENT: {
+            // Create a block region for the assignment to maintain order
+            Region* assign_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, assign_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = assign_region;
+            
             // Generate the assignment expression
             ir_generate_expression(ctx, stmt);
             
             // Pop the result (we don't need it for statement context)
             emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
+            
+            ctx->current_region = old_region;
             break;
         }
         
         case AST_BINARY_OP: {
+            // Create a block region for the expression statement to maintain order
+            Region* expr_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, expr_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = expr_region;
+            
             // Generate the binary operation expression
             ir_generate_expression(ctx, stmt);
             
             // Pop the result (we don't need it for statement context)
             emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
+            
+            ctx->current_region = old_region;
             break;
         }
         
@@ -416,6 +443,35 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
                 ir_generate_statement(ctx, stmt->data.if_statement.else_statement);
                 ctx->current_region = old_region;
             }
+            
+            break;
+        }
+        
+        case AST_COMPOUND_STATEMENT: {
+            // Create a new scope for the compound statement
+            SymbolTable* previous_scope = ctx->current_scope;
+            ctx->current_scope = symbol_table_create(ctx->arena, previous_scope);
+            
+            if (!ctx->current_scope) {
+                ctx->current_scope = previous_scope;
+                return;
+            }
+            
+            // Create a BLOCK region for the compound statement
+            Region* block_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, block_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = block_region;
+            
+            // Generate IR for all statements in the compound statement
+            for (int i = 0; i < stmt->data.compound_statement.statement_count; i++) {
+                ir_generate_statement(ctx, stmt->data.compound_statement.statements[i]);
+            }
+            
+            // Restore previous region and scope
+            ctx->current_region = old_region;
+            ctx->current_scope = previous_scope;
             
             break;
         }

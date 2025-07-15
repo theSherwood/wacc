@@ -74,6 +74,7 @@ static ASTNode* parse_unary(Parser* parser);
 static ASTNode* parse_primary(Parser* parser);
 static ASTNode* parse_statement(Parser* parser);
 static ASTNode* parse_if_statement(Parser* parser);
+static ASTNode* parse_compound_statement(Parser* parser);
 
 static ASTNode* parse_primary(Parser* parser) {
   if (parser->current_token.type == TOKEN_INTEGER_LITERAL) {
@@ -436,6 +437,47 @@ static ASTNode* parse_if_statement(Parser* parser) {
     return node;
 }
 
+static ASTNode* parse_compound_statement(Parser* parser) {
+    if (!match_token(parser, TOKEN_OPEN_BRACE)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
+        return NULL;
+    }
+
+    ASTNode* node = create_ast_node(parser, AST_COMPOUND_STATEMENT);
+    if (!node) return NULL;
+
+    // Allocate space for statements
+    node->data.compound_statement.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
+    node->data.compound_statement.statement_count = 0;
+
+    // Parse statements until we hit the closing brace
+    while (parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
+        Token prev_token = parser->current_token;  // Save current position
+        ASTNode* stmt = parse_statement(parser);
+        if (stmt) {
+            if (node->data.compound_statement.statement_count >= MAX_STATEMENTS) {
+                report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "too many statements in block", "reduce number of statements");
+                return NULL;
+            }
+            node->data.compound_statement.statements[node->data.compound_statement.statement_count++] = stmt;
+        } else {
+            // Error in parsing statement, synchronize and continue
+            synchronize(parser);
+            // If we haven't advanced, force advance to avoid infinite loop
+            if (parser->current_token.start == prev_token.start) {
+                advance_token(parser);
+            }
+        }
+    }
+
+    if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
+        return NULL;
+    }
+
+    return node;
+}
+
 static ASTNode* parse_statement(Parser* parser) {
   if (parser->current_token.type == TOKEN_INT) {
         return parse_declaration(parser);
@@ -443,6 +485,10 @@ static ASTNode* parse_statement(Parser* parser) {
 
   if (parser->current_token.type == TOKEN_IF) {
         return parse_if_statement(parser);
+  }
+
+  if (parser->current_token.type == TOKEN_OPEN_BRACE) {
+        return parse_compound_statement(parser);
   }
 
   if (match_token(parser, TOKEN_RETURN)) {
@@ -699,6 +745,13 @@ static void ast_print_node(ASTNode* node, int depth) {
         ast_print_indent(depth + 1);
         printf("False:\n");
         ast_print_node(node->data.ternary_expression.false_expression, depth + 2);
+        break;
+
+    case AST_COMPOUND_STATEMENT:
+        printf("Compound Statement\n");
+        for (int i = 0; i < node->data.compound_statement.statement_count; i++) {
+            ast_print_node(node->data.compound_statement.statements[i], depth + 1);
+        }
         break;
 
     default:
