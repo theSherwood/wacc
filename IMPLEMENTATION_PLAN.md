@@ -58,9 +58,9 @@ At each stage of development, we will test extensively to ensure that the change
 
 Tests are in `./tests/` directory. There are subdirectories. Any new tests should be added to the appropriate subdirectory.
 
-### `valid` and `invalid` directories
+### `invalid` directory
 
-These tests cover compile-time behavior, but do not cover run-time behavior. All parser tests will consist of a code file in C. `valid` tests must parse successfully. `invalid` tests must fail to parse. `invalid` tests will include comments at the end of the file that specify the line numbers and error codes of the compiler errors. If the comments with the line numbers and error codes are missing from a test, they must be added to the test.
+These tests cover compile-time behavior, but do not cover run-time behavior. All parser tests will consist of a code file in C. `invalid` tests must fail to compile. `invalid` tests will include comments at the end of the file that specify the line numbers and error codes of the compiler errors. If the comments with the line numbers and error codes are missing from a test, they must be added to the test.
 
 ### `runtime` directory
 

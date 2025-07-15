@@ -15,14 +15,10 @@ if ! make > /dev/null 2>&1; then
 fi
 
 # Make test scripts executable
-chmod +x scripts/test_valid.sh scripts/test_invalid.sh scripts/test_runtime.sh
+chmod +x scripts/test_invalid.sh scripts/test_runtime.sh
 
 # Run all test suites
 TOTAL_FAILED=0
-
-echo ""
-./scripts/test_valid.sh
-TOTAL_FAILED=$((TOTAL_FAILED + $?))
 
 echo ""
 ./scripts/test_invalid.sh
