@@ -408,6 +408,34 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
         ir_generate_statement(&ctx, function_node->data.function.statements[i]);
     }
     
+    // Add implicit return 0 if the function doesn't have an explicit return
+    bool has_return = false;
+    for (size_t i = 0; i < func->body->instruction_count; i++) {
+        if (func->body->instructions[i].opcode == IR_RETURN) {
+            has_return = true;
+            break;
+        }
+    }
+    
+    if (!has_return) {
+        // Add implicit return 0
+        Instruction const_inst = {0};
+        const_inst.opcode = IR_CONST_INT;
+        const_inst.result_type = create_i32_type();
+        const_inst.operand_count = 1;
+        const_inst.operands[0].type = OPERAND_CONSTANT;
+        const_inst.operands[0].value.constant.int_value = 0;
+        const_inst.result_reg = -1;
+        region_add_instruction(arena, func->body, const_inst);
+        
+        Instruction return_inst = {0};
+        return_inst.opcode = IR_RETURN;
+        return_inst.result_type = create_void_type();
+        return_inst.operand_count = 0;
+        return_inst.result_reg = -1;
+        region_add_instruction(arena, func->body, return_inst);
+    }
+    
     return module;
 }
 

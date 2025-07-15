@@ -21,6 +21,7 @@
 // WASM opcodes
 #define WASM_LOCAL_GET 0x20
 #define WASM_LOCAL_SET 0x21
+#define WASM_DROP 0x1a
 #define WASM_I32_CONST 0x41
 #define WASM_I32_EQZ 0x45
 #define WASM_I32_EQ 0x46
@@ -292,10 +293,8 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
             break;
         }
         case IR_POP: {
-            // Drop top stack value (WASM doesn't have explicit pop, use drop)
-            // For now, store to a dummy local
-            buffer_write_byte(buf, arena, WASM_LOCAL_SET);
-            buffer_write_leb128_u32(buf, arena, 0);  // Store to dummy local
+            // Drop top stack value using WASM drop instruction
+            buffer_write_byte(buf, arena, WASM_DROP);
             break;
         }
         case IR_RETURN: {
