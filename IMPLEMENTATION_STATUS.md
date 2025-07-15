@@ -7,6 +7,7 @@
 **Goal**: Compile `int main() { return 42; }` to WASM
 
 **Implemented Features**:
+
 - **Lexer**: Recognizes `int`, `main`, `return`, `{`, `}`, `(`, `)`, `;`, integer literals
 - **Parser**: Handles simple function declaration with return statement
 - **AST**: `Program(Function(name, Statement))` where `Statement` is `Return(Constant(int))`
@@ -14,6 +15,7 @@
 - **Codegen**: Generates WASM bytecode (not WAT text) that returns integer constant
 
 **Grammar Implemented**:
+
 ```
 <program> ::= <function>
 <function> ::= "int" <id> "(" ")" "{" <statement> "}"
@@ -21,35 +23,43 @@
 <exp> ::= <int>
 ```
 
-**Files Created**:
-- `compiler.h` - Main header with type definitions and IR types
-- `arena.c` - Arena memory allocator
-- `lexer.c` - Lexical analyzer
-- `parser.c` - Recursive descent parser
-- `ir.c` - Intermediate representation generation
-- `codegen.c` - WASM bytecode generator
-- `main.c` - Compiler driver
-- `Makefile` - Build system
-
-**Test Results**:
-- Input: `int main() { return 42; }`
-- Output: Valid WASM bytecode module with `main` function returning `42`
-- Verification: WASM execution returns correct result
-
 **Pipeline**:
+
 1. C source → Lexer → Parser → AST
-2. AST → IR generation → IRModule 
+2. AST → IR generation → IRModule
 3. IRModule → Codegen → WASM bytecode
 4. WASM bytecode executed successfully
 
+### Step 2: Unary Operators ✅
+
+**Goal**: Add support for `!`, `~`, `-` operators
+
+**Implemented Features**:
+
+- **Lexer**: Recognizes `!`, `~`, `-` operators
+- **Parser**: Handles operator precedence for unary expressions with right-associativity
+- **AST**: `UnaryOp(operator, operand)` node implemented
+- **IR**: Added `IR_NEG`, `IR_NOT`, `IR_BITWISE_NOT` instructions
+- **Codegen**: Generates appropriate WASM instructions (`i32.eqz`, `i32.sub`, `i32.xor`) from IR
+
+**Grammar Implemented**:
+
+```
+<exp> ::= <int> | <unary_op> <exp>
+<unary_op> ::= "!" | "~" | "-"
+```
+
+**WASM Operations**:
+- `!` → `i32.eqz` (logical not)
+- `~` → `i32.const -1; i32.xor` (bitwise not)
+- `-` → `i32.const -1; i32.mul` (negation)
+
+**Testing**: All unary operator tests pass, including nested and complex expressions.
+
 ## Next Steps
 
-### Step 2: Unary Operators
-- Add support for `!`, `~`, `-` operators
-- Handle operator precedence for unary expressions
-- Generate appropriate WASM instructions
-
 ### Step 3: Binary Operators
+
 - Add arithmetic operators `+`, `-`, `*`, `/`, `%`
 - Handle operator precedence and associativity
 - Generate WASM arithmetic instructions

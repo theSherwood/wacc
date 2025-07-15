@@ -43,6 +43,39 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
             ir_emit_instruction(func, arena, IR_CONST_INT, i32_type, &operand, 1, (*reg_counter)++);
             break;
         }
+        case AST_UNARY_OP: {
+            // Generate IR for the operand first
+            ir_generate_expression(func, arena, expr->data.unary_op.operand, reg_counter);
+            
+            // Get the result register of the operand
+            int operand_reg = (*reg_counter) - 1;
+            
+            Type i32_type = get_i32_type();
+            Operand operand;
+            operand.type = OPERAND_REGISTER;
+            operand.value_type = i32_type;
+            operand.value.reg = operand_reg;
+            
+            // Choose the appropriate IR opcode based on the operator
+            IROpcode opcode;
+            switch (expr->data.unary_op.operator) {
+                case TOKEN_MINUS:
+                    opcode = IR_NEG;
+                    break;
+                case TOKEN_BANG:
+                    opcode = IR_NOT;
+                    break;
+                case TOKEN_TILDE:
+                    opcode = IR_BITWISE_NOT;
+                    break;
+                default:
+                    // Should not happen
+                    return;
+            }
+            
+            ir_emit_instruction(func, arena, opcode, i32_type, &operand, 1, (*reg_counter)++);
+            break;
+        }
         default:
             // Handle other expression types later
             break;

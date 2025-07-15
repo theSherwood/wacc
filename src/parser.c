@@ -56,8 +56,12 @@ static ASTNode* create_ast_node(Parser* parser, ASTNodeType type) {
     return node;
 }
 
-static ASTNode* parse_expression(Parser* parser) {
-    // For now, only handle integer constants
+// Forward declarations
+static ASTNode* parse_expression(Parser* parser);
+static ASTNode* parse_unary(Parser* parser);
+static ASTNode* parse_primary(Parser* parser);
+
+static ASTNode* parse_primary(Parser* parser) {
     if (parser->current_token.type == TOKEN_INTEGER_LITERAL) {
         ASTNode* node = create_ast_node(parser, AST_INTEGER_CONSTANT);
         if (!node) return NULL;
@@ -70,10 +74,51 @@ static ASTNode* parse_expression(Parser* parser) {
         return node;
     }
     
-    // Error: expected expression
-    report_error(parser, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add an integer literal");
+    // Handle parentheses
+    if (match_token(parser, TOKEN_OPEN_PAREN)) {
+        ASTNode* expr = parse_expression(parser);
+        if (!expr) return NULL;
+        
+        if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+            report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
+            return NULL;
+        }
+        
+        return expr;
+    }
+    
+    // Error: expected primary expression
+    report_error(parser, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add an integer literal or parenthesized expression");
     synchronize(parser);
     return NULL;
+}
+
+static ASTNode* parse_unary(Parser* parser) {
+    // Handle unary operators
+    if (parser->current_token.type == TOKEN_BANG ||
+        parser->current_token.type == TOKEN_TILDE ||
+        parser->current_token.type == TOKEN_MINUS) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* operand = parse_unary(parser);  // Right-associative
+        if (!operand) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_UNARY_OP);
+        if (!node) return NULL;
+        
+        node->data.unary_op.operator = op;
+        node->data.unary_op.operand = operand;
+        
+        return node;
+    }
+    
+    return parse_primary(parser);
+}
+
+static ASTNode* parse_expression(Parser* parser) {
+    return parse_unary(parser);
 }
 
 static ASTNode* parse_statement(Parser* parser) {

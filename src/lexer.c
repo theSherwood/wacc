@@ -103,6 +103,18 @@ Token lexer_next_token(Lexer* lexer) {
             token.type = TOKEN_SEMICOLON;
             token.length = 1;
             break;
+        case '!':
+            token.type = TOKEN_BANG;
+            token.length = 1;
+            break;
+        case '~':
+            token.type = TOKEN_TILDE;
+            token.length = 1;
+            break;
+        case '-':
+            token.type = TOKEN_MINUS;
+            token.length = 1;
+            break;
         default:
             if (is_identifier_start(c)) {
                 // Identifier or keyword

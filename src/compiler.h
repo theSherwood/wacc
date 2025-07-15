@@ -103,6 +103,9 @@ typedef enum {
   TOKEN_CLOSE_BRACE,
   TOKEN_SEMICOLON,
   TOKEN_INTEGER_LITERAL,
+  TOKEN_BANG,        // !
+  TOKEN_TILDE,       // ~
+  TOKEN_MINUS,       // -
   TOKEN_ERROR
 } TokenType;
 
@@ -128,7 +131,7 @@ Lexer* lexer_create(Arena* arena, const char* source, const char* filename, Erro
 Token lexer_next_token(Lexer* lexer);
 
 // AST nodes
-typedef enum { AST_PROGRAM, AST_FUNCTION, AST_RETURN_STATEMENT, AST_INTEGER_CONSTANT } ASTNodeType;
+typedef enum { AST_PROGRAM, AST_FUNCTION, AST_RETURN_STATEMENT, AST_INTEGER_CONSTANT, AST_UNARY_OP } ASTNodeType;
 
 typedef struct ASTNode {
   ASTNodeType type;
@@ -146,6 +149,10 @@ typedef struct ASTNode {
     struct {
       int value;
     } integer_constant;
+    struct {
+      TokenType operator;
+      struct ASTNode* operand;
+    } unary_op;
   } data;
 } ASTNode;
 
@@ -198,6 +205,10 @@ typedef enum {
   IR_SUB,
   IR_MUL,
   IR_DIV,
+  // Unary operations
+  IR_NEG,          // -
+  IR_NOT,          // !
+  IR_BITWISE_NOT,  // ~
   // Memory
   IR_LOAD_LOCAL,
   IR_STORE_LOCAL,

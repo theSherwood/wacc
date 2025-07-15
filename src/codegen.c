@@ -20,6 +20,10 @@
 
 // WASM opcodes
 #define WASM_I32_CONST 0x41
+#define WASM_I32_EQZ 0x45
+#define WASM_I32_SUB 0x6b
+#define WASM_I32_MUL 0x6c
+#define WASM_I32_XOR 0x73
 #define WASM_RETURN 0x0f
 #define WASM_END 0x0b
 
@@ -157,6 +161,25 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
         case IR_CONST_INT: {
             buffer_write_byte(buf, arena, WASM_I32_CONST);
             buffer_write_leb128_i32(buf, arena, inst->operands[0].value.constant.int_value);
+            break;
+        }
+        case IR_NEG: {
+            // Negate: x * -1
+            buffer_write_byte(buf, arena, WASM_I32_CONST);
+            buffer_write_leb128_i32(buf, arena, -1);
+            buffer_write_byte(buf, arena, WASM_I32_MUL);
+            break;
+        }
+        case IR_NOT: {
+            // Logical not: x == 0
+            buffer_write_byte(buf, arena, WASM_I32_EQZ);
+            break;
+        }
+        case IR_BITWISE_NOT: {
+            // Bitwise not: x XOR -1
+            buffer_write_byte(buf, arena, WASM_I32_CONST);
+            buffer_write_leb128_i32(buf, arena, -1);
+            buffer_write_byte(buf, arena, WASM_I32_XOR);
             break;
         }
         case IR_RETURN: {

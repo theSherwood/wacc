@@ -21,7 +21,7 @@ for test_file in tests/runtime/*.c; do
                 # Run the WASM file using Node.js
                 if command -v node > /dev/null 2>&1; then
                     # Extract expected output from comments in the test file
-                    expected_output=$(grep -o "// Expected: [0-9]*" "$test_file" | sed 's/\/\/ Expected: //')
+                    expected_output=$(grep -o "// Expected: -\?[0-9]*" "$test_file" | sed 's/\/\/ Expected: //')
                     
                     if [ -n "$expected_output" ]; then
                         actual_output=$(node test_wasm.js 2>/dev/null)

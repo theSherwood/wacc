@@ -2,7 +2,9 @@ Refer to @IMPLEMENTATION_PLAN.md for the implementation plan.
 
 Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it up to date when you make changes.
 
-@IR_OUTLINE.md has the plan for the intermediate representation.
+Refer to @IR_OUTLINE.md when changing the intermediate representation.
+
+Tests should be added to the `tests` directory.
 
 Don't attempt anything more than 3 times. If you can't succeed after 3 attempts, let me know so I can help.
 
