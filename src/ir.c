@@ -329,12 +329,15 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
         }
         
         case AST_VARIABLE_DECL: {
-            // Create a block region for the variable declaration to maintain order
-            Region* decl_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-            region_add_child(ctx->arena, ctx->current_region, decl_region);
-            
+            // Only create a block region for variable declarations if we're not already in a block
             Region* old_region = ctx->current_region;
-            ctx->current_region = decl_region;
+            bool create_region = (ctx->current_region->type != REGION_BLOCK);
+            
+            if (create_region) {
+                Region* decl_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+                region_add_child(ctx->arena, ctx->current_region, decl_region);
+                ctx->current_region = decl_region;
+            }
             
             Type var_type = create_i32_type();  // Assuming all vars are i32 for now
             
@@ -373,7 +376,9 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
                 emit_instruction(ctx, IR_STORE_LOCAL, var_type, &operand, 1);
             }
             
-            ctx->current_region = old_region;
+            if (create_region) {
+                ctx->current_region = old_region;
+            }
             break;
         }
         
