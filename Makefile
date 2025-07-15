@@ -9,10 +9,9 @@ $(TARGET): $(SOURCES)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 
 clean:
-	rm -f $(TARGET) out.wat
+	rm -f $(TARGET) out.wasm out.wat
 
-test: $(TARGET)
-	./$(TARGET) test_simple.c
-	cat out.wat
+test:
+	./scripts/test_all.sh
 
 .PHONY: all clean test

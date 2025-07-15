@@ -10,7 +10,8 @@ Don't attempt anything more than 3 times. If you can't succeed after 3 attempts,
 
 - `make` - Build the compiler
 - `make clean` - Clean build artifacts
-- `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wat)
+- `make test` - Run the tests
+- `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wasm)
 
 # When writing code
 
