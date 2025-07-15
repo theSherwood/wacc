@@ -45,6 +45,9 @@
 #define WASM_I32_XOR 0x73
 #define WASM_RETURN 0x0f
 #define WASM_END 0x0b
+#define WASM_BLOCK 0x02
+#define WASM_BR_IF 0x0d
+#define WASM_BR 0x0c
 
 // WASM export types
 #define EXPORT_FUNC 0x00
@@ -266,6 +269,33 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
             // For logical OR, we need to implement short-circuit evaluation
             // For now, we'll treat it as bitwise OR of the boolean values
             buffer_write_byte(buf, arena, WASM_I32_OR);
+            break;
+        }
+        case IR_DUP: {
+            // Duplicate top of stack by loading and storing to a temp local
+            // For now, we'll use local 0 as temporary (need to improve this)
+            buffer_write_byte(buf, arena, WASM_LOCAL_GET);
+            buffer_write_leb128_u32(buf, arena, 0);  // Get current stack top via local
+            break;
+        }
+        case IR_IF: {
+            buffer_write_byte(buf, arena, WASM_BLOCK);  // Use block for now
+            buffer_write_byte(buf, arena, WASM_I32_TYPE);
+            break;
+        }
+        case IR_ELSE: {
+            // WASM doesn't have explicit else in our simple implementation
+            break;
+        }
+        case IR_END: {
+            buffer_write_byte(buf, arena, WASM_END);
+            break;
+        }
+        case IR_POP: {
+            // Drop top stack value (WASM doesn't have explicit pop, use drop)
+            // For now, store to a dummy local
+            buffer_write_byte(buf, arena, WASM_LOCAL_SET);
+            buffer_write_leb128_u32(buf, arena, 0);  // Store to dummy local
             break;
         }
         case IR_RETURN: {

@@ -190,10 +190,26 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
         }
         
         case AST_BINARY_OP: {
-            // Generate left operand (pushes to stack)
-            ir_generate_expression(ctx, expr->data.binary_op.left);
+            // Handle logical operations with short-circuit evaluation
+            if (expr->data.binary_op.operator == TOKEN_AMP_AMP) {
+                // Logical AND: if (left) return right; else return left;
+                // For now, fall back to regular binary operation
+                ir_generate_expression(ctx, expr->data.binary_op.left);
+                ir_generate_expression(ctx, expr->data.binary_op.right);
+                emit_instruction(ctx, IR_LOGICAL_AND, create_i32_type(), NULL, 0);
+                break;
+            }
+            else if (expr->data.binary_op.operator == TOKEN_PIPE_PIPE) {
+                // Logical OR: if (left) return left; else return right;
+                // For now, fall back to regular binary operation
+                ir_generate_expression(ctx, expr->data.binary_op.left);
+                ir_generate_expression(ctx, expr->data.binary_op.right);
+                emit_instruction(ctx, IR_LOGICAL_OR, create_i32_type(), NULL, 0);
+                break;
+            }
             
-            // Generate right operand (pushes to stack)
+            // Regular binary operations - generate both operands first
+            ir_generate_expression(ctx, expr->data.binary_op.left);
             ir_generate_expression(ctx, expr->data.binary_op.right);
             
             // Emit binary operation (pops two operands, pushes result)
@@ -231,12 +247,6 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
                     break;
                 case TOKEN_GT_EQ:
                     opcode = IR_GE;
-                    break;
-                case TOKEN_AMP_AMP:
-                    opcode = IR_LOGICAL_AND;
-                    break;
-                case TOKEN_PIPE_PIPE:
-                    opcode = IR_LOGICAL_OR;
                     break;
                 default:
                     return;
@@ -335,6 +345,15 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
             break;
         }
         
+        case AST_BINARY_OP: {
+            // Generate the binary operation expression
+            ir_generate_expression(ctx, stmt);
+            
+            // Pop the result (we don't need it for statement context)
+            emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
+            break;
+        }
+        
         default:
             break;
     }
@@ -416,6 +435,7 @@ static const char* ir_opcode_to_string(IROpcode opcode) {
         case IR_STORE_LOCAL: return "local.set";
         case IR_RETURN: return "return";
         case IR_POP: return "drop";
+        case IR_DUP: return "dup";
         case IR_BLOCK: return "block";
         case IR_LOOP: return "loop";
         case IR_IF: return "if";
