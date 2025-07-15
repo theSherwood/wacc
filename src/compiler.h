@@ -397,6 +397,9 @@ typedef struct {
     size_t function_capacity;
 } IRModule;
 
+// Semantic analysis
+bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors);
+
 // IR generation
 IRModule* ir_generate(Arena* arena, ASTNode* ast);
 

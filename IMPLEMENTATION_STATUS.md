@@ -174,6 +174,34 @@ function main() -> i32 {
 
 **Testing**: All 44 tests pass with new stack-based IR system.
 
+### Semantic Analysis Pass ✅ (ARCHITECTURE IMPROVEMENT)
+
+**Goal**: Implement proper semantic analysis as a separate compiler phase between parsing and IR generation
+
+**Completed Implementation**:
+
+- **Separate Phase**: Created `src/semantic.c` as dedicated semantic analysis pass
+- **Symbol Table Management**: Proper scoped symbol tables for variable declarations and lookups
+- **Error Detection**: Detects and reports semantic errors with proper error codes:
+  - Variable redefinition (ERROR_SEM_REDEFINITION - 3004)
+  - Undefined variables (ERROR_SEM_UNDEFINED_VARIABLE - 3001)  
+  - Use-before-declare errors
+- **Error Handling**: Uses proper ErrorList system with source location tracking
+- **Architecture**: Follows planned compiler architecture with separate phases
+- **Integration**: Added to main.c compilation pipeline between parsing and IR generation
+
+**Features**:
+- Scoped symbol table with parent scope lookup
+- Variable redefinition detection in current scope
+- Undefined variable detection across all parent scopes
+- Assignment to undefined variables detection
+- Continues compilation through multiple errors for better error reporting
+
+**Testing**: All 77 tests pass including the 3 previously failing semantic error tests:
+- `tests/invalid/redefine.c` - now properly caught with ERROR_SEM_REDEFINITION
+- `tests/invalid/undeclared_var.c` - now properly caught with ERROR_SEM_UNDEFINED_VARIABLE  
+- `tests/invalid/var_declared_late.c` - now properly caught with ERROR_SEM_UNDEFINED_VARIABLE
+
 ## Next Steps
 
 ### Step 5: Control Flow

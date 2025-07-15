@@ -126,6 +126,18 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
+  // Perform semantic analysis
+  if (!semantic_analyze(arena, ast, errors)) {
+    if (error_list_has_errors(errors)) {
+      error_list_print(errors, input_path);
+    } else {
+      printf("Error: Semantic analysis failed\n");
+    }
+    arena_free(arena);
+    free(source);
+    return 1;
+  }
+
   // Generate IR
   IRModule* ir_module = ir_generate(arena, ast);
   if (!ir_module) {
