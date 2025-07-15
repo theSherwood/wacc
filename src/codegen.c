@@ -21,8 +21,25 @@
 // WASM opcodes
 #define WASM_I32_CONST 0x41
 #define WASM_I32_EQZ 0x45
+#define WASM_I32_EQ 0x46
+#define WASM_I32_NE 0x47
+#define WASM_I32_LT_S 0x48
+#define WASM_I32_LT_U 0x49
+#define WASM_I32_GT_S 0x4a
+#define WASM_I32_GT_U 0x4b
+#define WASM_I32_LE_S 0x4c
+#define WASM_I32_LE_U 0x4d
+#define WASM_I32_GE_S 0x4e
+#define WASM_I32_GE_U 0x4f
+#define WASM_I32_ADD 0x6a
 #define WASM_I32_SUB 0x6b
 #define WASM_I32_MUL 0x6c
+#define WASM_I32_DIV_S 0x6d
+#define WASM_I32_DIV_U 0x6e
+#define WASM_I32_REM_S 0x6f
+#define WASM_I32_REM_U 0x70
+#define WASM_I32_AND 0x71
+#define WASM_I32_OR 0x72
 #define WASM_I32_XOR 0x73
 #define WASM_RETURN 0x0f
 #define WASM_END 0x0b
@@ -180,6 +197,62 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
             buffer_write_byte(buf, arena, WASM_I32_CONST);
             buffer_write_leb128_i32(buf, arena, -1);
             buffer_write_byte(buf, arena, WASM_I32_XOR);
+            break;
+        }
+        case IR_ADD: {
+            buffer_write_byte(buf, arena, WASM_I32_ADD);
+            break;
+        }
+        case IR_SUB: {
+            buffer_write_byte(buf, arena, WASM_I32_SUB);
+            break;
+        }
+        case IR_MUL: {
+            buffer_write_byte(buf, arena, WASM_I32_MUL);
+            break;
+        }
+        case IR_DIV: {
+            buffer_write_byte(buf, arena, WASM_I32_DIV_S);
+            break;
+        }
+        case IR_MOD: {
+            buffer_write_byte(buf, arena, WASM_I32_REM_S);
+            break;
+        }
+        case IR_EQ: {
+            buffer_write_byte(buf, arena, WASM_I32_EQ);
+            break;
+        }
+        case IR_NE: {
+            buffer_write_byte(buf, arena, WASM_I32_NE);
+            break;
+        }
+        case IR_LT: {
+            buffer_write_byte(buf, arena, WASM_I32_LT_S);
+            break;
+        }
+        case IR_GT: {
+            buffer_write_byte(buf, arena, WASM_I32_GT_S);
+            break;
+        }
+        case IR_LE: {
+            buffer_write_byte(buf, arena, WASM_I32_LE_S);
+            break;
+        }
+        case IR_GE: {
+            buffer_write_byte(buf, arena, WASM_I32_GE_S);
+            break;
+        }
+        case IR_LOGICAL_AND: {
+            // For logical AND, we need to implement short-circuit evaluation
+            // For now, we'll treat it as bitwise AND of the boolean values
+            buffer_write_byte(buf, arena, WASM_I32_AND);
+            break;
+        }
+        case IR_LOGICAL_OR: {
+            // For logical OR, we need to implement short-circuit evaluation
+            // For now, we'll treat it as bitwise OR of the boolean values
+            buffer_write_byte(buf, arena, WASM_I32_OR);
             break;
         }
         case IR_RETURN: {

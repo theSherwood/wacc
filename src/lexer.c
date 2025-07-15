@@ -103,10 +103,7 @@ Token lexer_next_token(Lexer* lexer) {
             token.type = TOKEN_SEMICOLON;
             token.length = 1;
             break;
-        case '!':
-            token.type = TOKEN_BANG;
-            token.length = 1;
-            break;
+
         case '~':
             token.type = TOKEN_TILDE;
             token.length = 1;
@@ -114,6 +111,133 @@ Token lexer_next_token(Lexer* lexer) {
         case '-':
             token.type = TOKEN_MINUS;
             token.length = 1;
+            break;
+        case '+':
+            token.type = TOKEN_PLUS;
+            token.length = 1;
+            break;
+        case '*':
+            token.type = TOKEN_STAR;
+            token.length = 1;
+            break;
+        case '/':
+            token.type = TOKEN_SLASH;
+            token.length = 1;
+            break;
+        case '%':
+            token.type = TOKEN_PERCENT;
+            token.length = 1;
+            break;
+        case '<':
+            if (*lexer->current == '=') {
+                token.type = TOKEN_LT_EQ;
+                token.length = 2;
+                lexer->current++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_LT;
+                token.length = 1;
+            }
+            break;
+        case '>':
+            if (*lexer->current == '=') {
+                token.type = TOKEN_GT_EQ;
+                token.length = 2;
+                lexer->current++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_GT;
+                token.length = 1;
+            }
+            break;
+        case '!':
+            if (*lexer->current == '=') {
+                token.type = TOKEN_BANG_EQ;
+                token.length = 2;
+                lexer->current++;
+                lexer->column++;
+            } else {
+                token.type = TOKEN_BANG;
+                token.length = 1;
+            }
+            break;
+        case '=':
+            if (*lexer->current == '=') {
+                token.type = TOKEN_EQ_EQ;
+                token.length = 2;
+                lexer->current++;
+                lexer->column++;
+            } else {
+                // This is a single '=' which we don't handle in this step
+                if (lexer->errors) {
+                    SourceLocation location = {
+                        .filename = lexer->filename,
+                        .line = lexer->line,
+                        .column = lexer->column - 1,
+                        .start_pos = lexer->current - lexer->source - 1,
+                        .end_pos = lexer->current - lexer->source
+                    };
+                    
+                    error_list_add(lexer->errors, NULL, 
+                                  ERROR_LEX_INVALID_CHARACTER, ERROR_LEXICAL, location, 
+                                  "unexpected character '='", "use '==' for comparison", NULL);
+                }
+                
+                token.type = TOKEN_ERROR;
+                token.length = 1;
+            }
+            break;
+        case '&':
+            if (*lexer->current == '&') {
+                token.type = TOKEN_AMP_AMP;
+                token.length = 2;
+                lexer->current++;
+                lexer->column++;
+            } else {
+                // This is a single '&' which we don't handle in this step
+                if (lexer->errors) {
+                    SourceLocation location = {
+                        .filename = lexer->filename,
+                        .line = lexer->line,
+                        .column = lexer->column - 1,
+                        .start_pos = lexer->current - lexer->source - 1,
+                        .end_pos = lexer->current - lexer->source
+                    };
+                    
+                    error_list_add(lexer->errors, NULL, 
+                                  ERROR_LEX_INVALID_CHARACTER, ERROR_LEXICAL, location, 
+                                  "unexpected character '&'", "use '&&' for logical AND", NULL);
+                }
+                
+                token.type = TOKEN_ERROR;
+                token.length = 1;
+            }
+            break;
+        case '|':
+            if (*lexer->current == '|') {
+                token.type = TOKEN_PIPE_PIPE;
+                token.length = 2;
+                lexer->current++;
+                lexer->column++;
+            } else {
+                // This is a single '|' which we don't handle in this step
+                if (lexer->errors) {
+                    SourceLocation location = {
+                        .filename = lexer->filename,
+                        .line = lexer->line,
+                        .column = lexer->column - 1,
+                        .start_pos = lexer->current - lexer->source - 1,
+                        .end_pos = lexer->current - lexer->source
+                    };
+                    
+                    error_list_add(lexer->errors, NULL, 
+                                  ERROR_LEX_INVALID_CHARACTER, ERROR_LEXICAL, location, 
+                                  "unexpected character '|'", "use '||' for logical OR", NULL);
+                }
+                
+                token.type = TOKEN_ERROR;
+                token.length = 1;
+            }
             break;
         default:
             if (is_identifier_start(c)) {

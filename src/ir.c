@@ -76,6 +76,78 @@ static void ir_generate_expression(IRFunction* func, Arena* arena, ASTNode* expr
             ir_emit_instruction(func, arena, opcode, i32_type, &operand, 1, (*reg_counter)++);
             break;
         }
+        case AST_BINARY_OP: {
+            // Generate IR for left operand
+            ir_generate_expression(func, arena, expr->data.binary_op.left, reg_counter);
+            int left_reg = (*reg_counter) - 1;
+            
+            // Generate IR for right operand
+            ir_generate_expression(func, arena, expr->data.binary_op.right, reg_counter);
+            int right_reg = (*reg_counter) - 1;
+            
+            Type i32_type = get_i32_type();
+            Operand operands[2];
+            
+            // Left operand
+            operands[0].type = OPERAND_REGISTER;
+            operands[0].value_type = i32_type;
+            operands[0].value.reg = left_reg;
+            
+            // Right operand
+            operands[1].type = OPERAND_REGISTER;
+            operands[1].value_type = i32_type;
+            operands[1].value.reg = right_reg;
+            
+            // Choose the appropriate IR opcode based on the operator
+            IROpcode opcode;
+            switch (expr->data.binary_op.operator) {
+                case TOKEN_PLUS:
+                    opcode = IR_ADD;
+                    break;
+                case TOKEN_MINUS:
+                    opcode = IR_SUB;
+                    break;
+                case TOKEN_STAR:
+                    opcode = IR_MUL;
+                    break;
+                case TOKEN_SLASH:
+                    opcode = IR_DIV;
+                    break;
+                case TOKEN_PERCENT:
+                    opcode = IR_MOD;
+                    break;
+                case TOKEN_EQ_EQ:
+                    opcode = IR_EQ;
+                    break;
+                case TOKEN_BANG_EQ:
+                    opcode = IR_NE;
+                    break;
+                case TOKEN_LT:
+                    opcode = IR_LT;
+                    break;
+                case TOKEN_GT:
+                    opcode = IR_GT;
+                    break;
+                case TOKEN_LT_EQ:
+                    opcode = IR_LE;
+                    break;
+                case TOKEN_GT_EQ:
+                    opcode = IR_GE;
+                    break;
+                case TOKEN_AMP_AMP:
+                    opcode = IR_LOGICAL_AND;
+                    break;
+                case TOKEN_PIPE_PIPE:
+                    opcode = IR_LOGICAL_OR;
+                    break;
+                default:
+                    // Should not happen
+                    return;
+            }
+            
+            ir_emit_instruction(func, arena, opcode, i32_type, operands, 2, (*reg_counter)++);
+            break;
+        }
         default:
             // Handle other expression types later
             break;

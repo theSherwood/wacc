@@ -58,6 +58,12 @@ static ASTNode* create_ast_node(Parser* parser, ASTNodeType type) {
 
 // Forward declarations
 static ASTNode* parse_expression(Parser* parser);
+static ASTNode* parse_logical_or(Parser* parser);
+static ASTNode* parse_logical_and(Parser* parser);
+static ASTNode* parse_equality(Parser* parser);
+static ASTNode* parse_relational(Parser* parser);
+static ASTNode* parse_additive(Parser* parser);
+static ASTNode* parse_multiplicative(Parser* parser);
 static ASTNode* parse_unary(Parser* parser);
 static ASTNode* parse_primary(Parser* parser);
 
@@ -117,8 +123,165 @@ static ASTNode* parse_unary(Parser* parser) {
     return parse_primary(parser);
 }
 
+static ASTNode* parse_multiplicative(Parser* parser) {
+    ASTNode* left = parse_unary(parser);
+    if (!left) return NULL;
+    
+    while (parser->current_token.type == TOKEN_STAR ||
+           parser->current_token.type == TOKEN_SLASH ||
+           parser->current_token.type == TOKEN_PERCENT) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* right = parse_unary(parser);
+        if (!right) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
+        if (!node) return NULL;
+        
+        node->data.binary_op.operator = op;
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
+        
+        left = node;
+    }
+    
+    return left;
+}
+
+static ASTNode* parse_additive(Parser* parser) {
+    ASTNode* left = parse_multiplicative(parser);
+    if (!left) return NULL;
+    
+    while (parser->current_token.type == TOKEN_PLUS ||
+           parser->current_token.type == TOKEN_MINUS) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* right = parse_multiplicative(parser);
+        if (!right) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
+        if (!node) return NULL;
+        
+        node->data.binary_op.operator = op;
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
+        
+        left = node;
+    }
+    
+    return left;
+}
+
+static ASTNode* parse_relational(Parser* parser) {
+    ASTNode* left = parse_additive(parser);
+    if (!left) return NULL;
+    
+    while (parser->current_token.type == TOKEN_LT ||
+           parser->current_token.type == TOKEN_GT ||
+           parser->current_token.type == TOKEN_LT_EQ ||
+           parser->current_token.type == TOKEN_GT_EQ) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* right = parse_additive(parser);
+        if (!right) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
+        if (!node) return NULL;
+        
+        node->data.binary_op.operator = op;
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
+        
+        left = node;
+    }
+    
+    return left;
+}
+
+static ASTNode* parse_equality(Parser* parser) {
+    ASTNode* left = parse_relational(parser);
+    if (!left) return NULL;
+    
+    while (parser->current_token.type == TOKEN_EQ_EQ ||
+           parser->current_token.type == TOKEN_BANG_EQ) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* right = parse_relational(parser);
+        if (!right) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
+        if (!node) return NULL;
+        
+        node->data.binary_op.operator = op;
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
+        
+        left = node;
+    }
+    
+    return left;
+}
+
+static ASTNode* parse_logical_and(Parser* parser) {
+    ASTNode* left = parse_equality(parser);
+    if (!left) return NULL;
+    
+    while (parser->current_token.type == TOKEN_AMP_AMP) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* right = parse_equality(parser);
+        if (!right) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
+        if (!node) return NULL;
+        
+        node->data.binary_op.operator = op;
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
+        
+        left = node;
+    }
+    
+    return left;
+}
+
+static ASTNode* parse_logical_or(Parser* parser) {
+    ASTNode* left = parse_logical_and(parser);
+    if (!left) return NULL;
+    
+    while (parser->current_token.type == TOKEN_PIPE_PIPE) {
+        
+        TokenType op = parser->current_token.type;
+        advance_token(parser);
+        
+        ASTNode* right = parse_logical_and(parser);
+        if (!right) return NULL;
+        
+        ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
+        if (!node) return NULL;
+        
+        node->data.binary_op.operator = op;
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
+        
+        left = node;
+    }
+    
+    return left;
+}
+
 static ASTNode* parse_expression(Parser* parser) {
-    return parse_unary(parser);
+    return parse_logical_or(parser);
 }
 
 static ASTNode* parse_statement(Parser* parser) {

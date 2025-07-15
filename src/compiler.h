@@ -106,6 +106,18 @@ typedef enum {
   TOKEN_BANG,        // !
   TOKEN_TILDE,       // ~
   TOKEN_MINUS,       // -
+  TOKEN_PLUS,        // +
+  TOKEN_STAR,        // *
+  TOKEN_SLASH,       // /
+  TOKEN_PERCENT,     // %
+  TOKEN_EQ_EQ,       // ==
+  TOKEN_BANG_EQ,     // !=
+  TOKEN_LT,          // <
+  TOKEN_GT,          // >
+  TOKEN_LT_EQ,       // <=
+  TOKEN_GT_EQ,       // >=
+  TOKEN_AMP_AMP,     // &&
+  TOKEN_PIPE_PIPE,   // ||
   TOKEN_ERROR
 } TokenType;
 
@@ -131,7 +143,7 @@ Lexer* lexer_create(Arena* arena, const char* source, const char* filename, Erro
 Token lexer_next_token(Lexer* lexer);
 
 // AST nodes
-typedef enum { AST_PROGRAM, AST_FUNCTION, AST_RETURN_STATEMENT, AST_INTEGER_CONSTANT, AST_UNARY_OP } ASTNodeType;
+typedef enum { AST_PROGRAM, AST_FUNCTION, AST_RETURN_STATEMENT, AST_INTEGER_CONSTANT, AST_UNARY_OP, AST_BINARY_OP } ASTNodeType;
 
 typedef struct ASTNode {
   ASTNodeType type;
@@ -153,6 +165,11 @@ typedef struct ASTNode {
       TokenType operator;
       struct ASTNode* operand;
     } unary_op;
+    struct {
+      TokenType operator;
+      struct ASTNode* left;
+      struct ASTNode* right;
+    } binary_op;
   } data;
 } ASTNode;
 
@@ -205,6 +222,17 @@ typedef enum {
   IR_SUB,
   IR_MUL,
   IR_DIV,
+  IR_MOD,
+  // Comparison
+  IR_EQ,
+  IR_NE,
+  IR_LT,
+  IR_GT,
+  IR_LE,
+  IR_GE,
+  // Logical
+  IR_LOGICAL_AND,
+  IR_LOGICAL_OR,
   // Unary operations
   IR_NEG,          // -
   IR_NOT,          // !

@@ -56,10 +56,53 @@
 
 **Testing**: All unary operator tests pass, including nested and complex expressions.
 
+### Step 3: Binary Operators ✅
+
+**Goal**: Add arithmetic operators `+`, `-`, `*`, `/`, `%` and logical/comparison operators
+
+**Implemented Features**:
+
+- **Lexer**: Recognizes `+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||` operators
+- **Parser**: Implements operator precedence and associativity according to C99 standard
+- **AST**: `BinaryOp(left, operator, right)` node implemented
+- **IR**: Added binary operation IR instructions: `IR_ADD`, `IR_SUB`, `IR_MUL`, `IR_DIV`, `IR_MOD`, `IR_EQ`, `IR_NE`, `IR_LT`, `IR_GT`, `IR_LE`, `IR_GE`, `IR_LOGICAL_AND`, `IR_LOGICAL_OR`
+- **Codegen**: Generates appropriate WASM instructions for all binary operations
+
+**Grammar Implemented**:
+
+```
+<exp> ::= <logical_or_exp>
+<logical_or_exp> ::= <logical_and_exp> ("||" <logical_and_exp>)*
+<logical_and_exp> ::= <equality_exp> ("&&" <equality_exp>)*
+<equality_exp> ::= <relational_exp> (("==" | "!=") <relational_exp>)*
+<relational_exp> ::= <additive_exp> (("<" | ">" | "<=" | ">=") <additive_exp>)*
+<additive_exp> ::= <multiplicative_exp> (("+" | "-") <multiplicative_exp>)*
+<multiplicative_exp> ::= <unary_exp> (("*" | "/" | "%") <unary_exp>)*
+<unary_exp> ::= <primary_exp> | <unary_op> <unary_exp>
+<primary_exp> ::= <int> | "(" <exp> ")"
+```
+
+**WASM Operations**:
+- `+` → `i32.add`
+- `-` → `i32.sub`
+- `*` → `i32.mul`
+- `/` → `i32.div_s`
+- `%` → `i32.rem_s`
+- `==` → `i32.eq`
+- `!=` → `i32.ne`
+- `<` → `i32.lt_s`
+- `>` → `i32.gt_s`
+- `<=` → `i32.le_s`
+- `>=` → `i32.ge_s`
+- `&&` → `i32.and` (basic implementation)
+- `||` → `i32.or` (basic implementation)
+
+**Testing**: All binary operator tests pass, including precedence and mixed expressions.
+
 ## Next Steps
 
-### Step 3: Binary Operators
+### Step 4: Variables and Assignment
 
-- Add arithmetic operators `+`, `-`, `*`, `/`, `%`
-- Handle operator precedence and associativity
-- Generate WASM arithmetic instructions
+- Add local variable declarations
+- Implement assignment operators
+- Add symbol table management
