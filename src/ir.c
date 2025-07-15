@@ -279,6 +279,38 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
             break;
         }
         
+        case AST_TERNARY_EXPRESSION: {
+            // Create IF region for ternary
+            Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, if_region);
+            
+            // Generate condition expression in the if region (pushes value to stack)
+            ctx->current_region = if_region;
+            ir_generate_expression(ctx, expr->data.ternary_expression.condition);
+            ctx->current_region = if_region->parent;
+            
+            // Generate true branch
+            Region* then_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
+            if_region->data.if_data.then_region = then_region;
+            region_add_child(ctx->arena, if_region, then_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = then_region;
+            ir_generate_expression(ctx, expr->data.ternary_expression.true_expression);
+            ctx->current_region = old_region;
+            
+            // Generate false branch
+            Region* else_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
+            if_region->data.if_data.else_region = else_region;
+            region_add_child(ctx->arena, if_region, else_region);
+            
+            ctx->current_region = else_region;
+            ir_generate_expression(ctx, expr->data.ternary_expression.false_expression);
+            ctx->current_region = old_region;
+            
+            break;
+        }
+        
         default:
             break;
     }
@@ -354,9 +386,64 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
             break;
         }
         
+        case AST_IF_STATEMENT: {
+            // Create IF region
+            Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, if_region);
+            
+            // Generate condition expression in the if region (pushes value to stack)
+            ctx->current_region = if_region;
+            ir_generate_expression(ctx, stmt->data.if_statement.condition);
+            ctx->current_region = if_region->parent;
+            
+            // Generate then branch
+            Region* then_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
+            if_region->data.if_data.then_region = then_region;
+            region_add_child(ctx->arena, if_region, then_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = then_region;
+            ir_generate_statement(ctx, stmt->data.if_statement.then_statement);
+            ctx->current_region = old_region;
+            
+            // Generate else branch if present
+            if (stmt->data.if_statement.else_statement) {
+                Region* else_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
+                if_region->data.if_data.else_region = else_region;
+                region_add_child(ctx->arena, if_region, else_region);
+                
+                ctx->current_region = else_region;
+                ir_generate_statement(ctx, stmt->data.if_statement.else_statement);
+                ctx->current_region = old_region;
+            }
+            
+            break;
+        }
+        
         default:
             break;
     }
+}
+
+// Helper function to check if a region contains a return statement
+static bool region_has_return(Region* region) {
+    if (!region) return false;
+    
+    // Check instructions in this region
+    for (size_t i = 0; i < region->instruction_count; i++) {
+        if (region->instructions[i].opcode == IR_RETURN) {
+            return true;
+        }
+    }
+    
+    // Check child regions recursively
+    for (size_t i = 0; i < region->child_count; i++) {
+        if (region_has_return(region->children[i])) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // Main IR generation function
@@ -409,13 +496,7 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
     }
     
     // Add implicit return 0 if the function doesn't have an explicit return
-    bool has_return = false;
-    for (size_t i = 0; i < func->body->instruction_count; i++) {
-        if (func->body->instructions[i].opcode == IR_RETURN) {
-            has_return = true;
-            break;
-        }
-    }
+    bool has_return = region_has_return(func->body);
     
     if (!has_return) {
         // Add implicit return 0

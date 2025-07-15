@@ -62,6 +62,8 @@ static ASTNode* create_ast_node(Parser* parser, ASTNodeType type) {
 
 // Forward declarations
 static ASTNode* parse_expression(Parser* parser);
+static ASTNode* parse_assignment_expression(Parser* parser);
+static ASTNode* parse_ternary_expression(Parser* parser);
 static ASTNode* parse_logical_or(Parser* parser);
 static ASTNode* parse_logical_and(Parser* parser);
 static ASTNode* parse_equality(Parser* parser);
@@ -71,6 +73,7 @@ static ASTNode* parse_multiplicative(Parser* parser);
 static ASTNode* parse_unary(Parser* parser);
 static ASTNode* parse_primary(Parser* parser);
 static ASTNode* parse_statement(Parser* parser);
+static ASTNode* parse_if_statement(Parser* parser);
 
 static ASTNode* parse_primary(Parser* parser) {
   if (parser->current_token.type == TOKEN_INTEGER_LITERAL) {
@@ -297,8 +300,37 @@ static ASTNode* parse_logical_or(Parser* parser) {
   return left;
 }
 
+static ASTNode* parse_ternary_expression(Parser* parser) {
+    ASTNode* condition = parse_logical_or(parser);
+    if (!condition) return NULL;
+
+    if (match_token(parser, TOKEN_QUESTION)) {
+        ASTNode* true_expr = parse_expression(parser);
+        if (!true_expr) return NULL;
+
+        if (!match_token(parser, TOKEN_COLON)) {
+            report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected ':' in ternary expression", "add ':'");
+            return NULL;
+        }
+
+        ASTNode* false_expr = parse_ternary_expression(parser); // Right-associative
+        if (!false_expr) return NULL;
+
+        ASTNode* node = create_ast_node(parser, AST_TERNARY_EXPRESSION);
+        if (!node) return NULL;
+
+        node->data.ternary_expression.condition = condition;
+        node->data.ternary_expression.true_expression = true_expr;
+        node->data.ternary_expression.false_expression = false_expr;
+
+        return node;
+    }
+
+    return condition;
+}
+
 static ASTNode* parse_assignment_expression(Parser* parser) {
-    ASTNode* left = parse_logical_or(parser);
+    ASTNode* left = parse_ternary_expression(parser);
 
     if (match_token(parser, TOKEN_EQ)) {
         ASTNode* right = parse_assignment_expression(parser); // Right-associative
@@ -366,9 +398,51 @@ static ASTNode* parse_declaration(Parser* parser) {
 }
 
 
+static ASTNode* parse_if_statement(Parser* parser) {
+    if (!match_token(parser, TOKEN_IF)) {
+        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'if'", "add 'if' keyword");
+        return NULL;
+    }
+
+    if (!match_token(parser, TOKEN_OPEN_PAREN)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('");
+        return NULL;
+    }
+
+    ASTNode* condition = parse_expression(parser);
+    if (!condition) return NULL;
+
+    if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after if condition", "add ')'");
+        return NULL;
+    }
+
+    ASTNode* then_statement = parse_statement(parser);
+    if (!then_statement) return NULL;
+
+    ASTNode* else_statement = NULL;
+    if (match_token(parser, TOKEN_ELSE)) {
+        else_statement = parse_statement(parser);
+        if (!else_statement) return NULL;
+    }
+
+    ASTNode* node = create_ast_node(parser, AST_IF_STATEMENT);
+    if (!node) return NULL;
+
+    node->data.if_statement.condition = condition;
+    node->data.if_statement.then_statement = then_statement;
+    node->data.if_statement.else_statement = else_statement;
+
+    return node;
+}
+
 static ASTNode* parse_statement(Parser* parser) {
   if (parser->current_token.type == TOKEN_INT) {
         return parse_declaration(parser);
+  }
+
+  if (parser->current_token.type == TOKEN_IF) {
+        return parse_if_statement(parser);
   }
 
   if (match_token(parser, TOKEN_RETURN)) {
@@ -597,6 +671,34 @@ static void ast_print_node(ASTNode* node, int depth) {
     case AST_ASSIGNMENT:
         printf("Assignment: %s\n", node->data.assignment.name);
         ast_print_node(node->data.assignment.value, depth + 1);
+        break;
+
+    case AST_IF_STATEMENT:
+        printf("If Statement\n");
+        ast_print_indent(depth + 1);
+        printf("Condition:\n");
+        ast_print_node(node->data.if_statement.condition, depth + 2);
+        ast_print_indent(depth + 1);
+        printf("Then:\n");
+        ast_print_node(node->data.if_statement.then_statement, depth + 2);
+        if (node->data.if_statement.else_statement) {
+            ast_print_indent(depth + 1);
+            printf("Else:\n");
+            ast_print_node(node->data.if_statement.else_statement, depth + 2);
+        }
+        break;
+
+    case AST_TERNARY_EXPRESSION:
+        printf("Ternary Expression\n");
+        ast_print_indent(depth + 1);
+        printf("Condition:\n");
+        ast_print_node(node->data.ternary_expression.condition, depth + 2);
+        ast_print_indent(depth + 1);
+        printf("True:\n");
+        ast_print_node(node->data.ternary_expression.true_expression, depth + 2);
+        ast_print_indent(depth + 1);
+        printf("False:\n");
+        ast_print_node(node->data.ternary_expression.false_expression, depth + 2);
         break;
 
     default:

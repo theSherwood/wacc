@@ -48,6 +48,12 @@ static TokenType get_keyword_type(const char* start, size_t length) {
     if (length == 6 && str_ncmp(start, "return", 6) == 0) {
         return TOKEN_RETURN;
     }
+    if (length == 2 && str_ncmp(start, "if", 2) == 0) {
+        return TOKEN_IF;
+    }
+    if (length == 4 && str_ncmp(start, "else", 4) == 0) {
+        return TOKEN_ELSE;
+    }
     return TOKEN_IDENTIFIER;
 }
 
@@ -101,6 +107,14 @@ Token lexer_next_token(Lexer* lexer) {
             break;
         case ';':
             token.type = TOKEN_SEMICOLON;
+            token.length = 1;
+            break;
+        case '?':
+            token.type = TOKEN_QUESTION;
+            token.length = 1;
+            break;
+        case ':':
+            token.type = TOKEN_COLON;
             token.length = 1;
             break;
 

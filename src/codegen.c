@@ -47,6 +47,9 @@
 #define WASM_RETURN 0x0f
 #define WASM_END 0x0b
 #define WASM_BLOCK 0x02
+#define WASM_LOOP 0x03
+#define WASM_IF 0x04
+#define WASM_ELSE 0x05
 #define WASM_BR_IF 0x0d
 #define WASM_BR 0x0c
 
@@ -280,12 +283,18 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
             break;
         }
         case IR_IF: {
-            buffer_write_byte(buf, arena, WASM_BLOCK);  // Use block for now
-            buffer_write_byte(buf, arena, WASM_I32_TYPE);
+            // The condition is already on the stack from expression evaluation
+            buffer_write_byte(buf, arena, WASM_IF);
+            // Use void type for statement context, i32 for expression context
+            if (inst->result_type.kind == TYPE_VOID) {
+                buffer_write_byte(buf, arena, 0x40);  // void result type
+            } else {
+                buffer_write_byte(buf, arena, WASM_I32_TYPE);  // i32 result type for expressions
+            }
             break;
         }
         case IR_ELSE: {
-            // WASM doesn't have explicit else in our simple implementation
+            buffer_write_byte(buf, arena, WASM_ELSE);
             break;
         }
         case IR_END: {
@@ -310,14 +319,62 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
 static void emit_region(Buffer* buf, Arena* arena, Region* region) {
     if (!region) return;
     
-    // Emit instructions in this region
-    for (size_t i = 0; i < region->instruction_count; i++) {
-        emit_instruction(buf, arena, &region->instructions[i]);
-    }
-    
-    // Emit child regions
-    for (size_t i = 0; i < region->child_count; i++) {
-        emit_region(buf, arena, region->children[i]);
+    if (region->type == REGION_IF) {
+        // First emit instructions in this region (includes condition)
+        for (size_t i = 0; i < region->instruction_count; i++) {
+            emit_instruction(buf, arena, &region->instructions[i]);
+        }
+        
+        // For IF regions, emit the structured control flow
+        buffer_write_byte(buf, arena, WASM_IF);
+        
+        // Determine result type based on context
+        // For now, always use i32 for expressions, void for statements  
+        if (region->data.if_data.then_region && region->data.if_data.else_region) {
+            // Both branches exist - likely ternary expression
+            buffer_write_byte(buf, arena, WASM_I32_TYPE);
+        } else {
+            // Statement context - void
+            buffer_write_byte(buf, arena, 0x40);  // void
+        }
+        
+        // Emit then branch
+        if (region->data.if_data.then_region) {
+            emit_region(buf, arena, region->data.if_data.then_region);
+        }
+        
+        // Emit else branch if present
+        if (region->data.if_data.else_region) {
+            buffer_write_byte(buf, arena, WASM_ELSE);
+            emit_region(buf, arena, region->data.if_data.else_region);
+        }
+        
+        // End the if
+        buffer_write_byte(buf, arena, WASM_END);
+    } else {
+        // For FUNCTION regions, emit child regions first (statements processed first)
+        // For other region types, emit instructions first, then child regions
+        if (region->type == REGION_FUNCTION) {
+            // Emit child regions first (control flow statements)
+            for (size_t i = 0; i < region->child_count; i++) {
+                emit_region(buf, arena, region->children[i]);
+            }
+            
+            // Then emit function-level instructions
+            for (size_t i = 0; i < region->instruction_count; i++) {
+                emit_instruction(buf, arena, &region->instructions[i]);
+            }
+        } else {
+            // For other region types, emit instructions normally
+            for (size_t i = 0; i < region->instruction_count; i++) {
+                emit_instruction(buf, arena, &region->instructions[i]);
+            }
+            
+            // Emit child regions
+            for (size_t i = 0; i < region->child_count; i++) {
+                emit_region(buf, arena, region->children[i]);
+            }
+        }
     }
 }
 

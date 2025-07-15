@@ -121,6 +121,10 @@ typedef enum {
   TOKEN_GT_EQ,       // >=
   TOKEN_AMP_AMP,     // &&
   TOKEN_PIPE_PIPE,   // ||
+  TOKEN_IF,          // if
+  TOKEN_ELSE,        // else
+  TOKEN_QUESTION,    // ?
+  TOKEN_COLON,       // :
   TOKEN_ERROR
 } TokenType;
 
@@ -155,7 +159,9 @@ typedef enum {
     AST_BINARY_OP,
     AST_VARIABLE_DECL,
     AST_VARIABLE_REF,
-    AST_ASSIGNMENT
+    AST_ASSIGNMENT,
+    AST_IF_STATEMENT,
+    AST_TERNARY_EXPRESSION
 } ASTNodeType;
 
 typedef struct ASTNode {
@@ -197,6 +203,16 @@ typedef struct ASTNode {
         const char* name;
         struct ASTNode* value;
     } assignment;
+    struct {
+        struct ASTNode* condition;
+        struct ASTNode* then_statement;
+        struct ASTNode* else_statement;  // Can be NULL
+    } if_statement;
+    struct {
+        struct ASTNode* condition;
+        struct ASTNode* true_expression;
+        struct ASTNode* false_expression;
+    } ternary_expression;
   } data;
 } ASTNode;
 
