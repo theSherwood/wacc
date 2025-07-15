@@ -198,3 +198,84 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
     
     return module;
 }
+
+static const char* ir_opcode_to_string(IROpcode opcode) {
+    switch (opcode) {
+        case IR_CONST_INT: return "const_int";
+        case IR_RETURN: return "return";
+        case IR_ADD: return "add";
+        case IR_SUB: return "sub";
+        case IR_MUL: return "mul";
+        case IR_DIV: return "div";
+        case IR_MOD: return "mod";
+        case IR_EQ: return "eq";
+        case IR_NE: return "ne";
+        case IR_LT: return "lt";
+        case IR_GT: return "gt";
+        case IR_LE: return "le";
+        case IR_GE: return "ge";
+        case IR_LOGICAL_AND: return "and";
+        case IR_LOGICAL_OR: return "or";
+        case IR_NEG: return "neg";
+        case IR_NOT: return "not";
+        case IR_BITWISE_NOT: return "bitnot";
+        case IR_LOAD_LOCAL: return "load_local";
+        case IR_STORE_LOCAL: return "store_local";
+        case IR_PUSH: return "push";
+        case IR_POP: return "pop";
+        default: return "unknown";
+    }
+}
+
+static void ir_print_operand(Operand* operand) {
+    switch (operand->type) {
+        case OPERAND_REGISTER:
+            printf("r%d", operand->value.reg);
+            break;
+        case OPERAND_CONSTANT:
+            printf("%d", operand->value.constant.int_value);
+            break;
+        case OPERAND_LOCAL:
+            printf("local%d", operand->value.local_index);
+            break;
+    }
+}
+
+static void ir_print_instruction(Instruction* inst) {
+    printf("  ");
+    
+    if (inst->result_reg >= 0) {
+        printf("r%d = ", inst->result_reg);
+    }
+    
+    printf("%s", ir_opcode_to_string(inst->opcode));
+    
+    for (int i = 0; i < inst->operand_count; i++) {
+        printf(i == 0 ? " " : ", ");
+        ir_print_operand(&inst->operands[i]);
+    }
+    
+    printf("\n");
+}
+
+void ir_print(IRModule* ir_module) {
+    if (!ir_module) {
+        printf("(null IR module)\n");
+        return;
+    }
+    
+    printf("=== IR ===\n");
+    
+    for (size_t i = 0; i < ir_module->function_count; i++) {
+        IRFunction* func = &ir_module->functions[i];
+        printf("function%zu:\n", i);
+        
+        for (size_t j = 0; j < func->instruction_count; j++) {
+            ir_print_instruction(&func->instructions[j]);
+        }
+        
+        printf("\n");
+    }
+    
+    printf("==========\n");
+}

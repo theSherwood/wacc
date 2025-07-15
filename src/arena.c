@@ -12,7 +12,7 @@ typedef struct ArenaChunk {
   struct ArenaChunk* next;
   size_t capacity;
   size_t used;
-  size_t mem[];
+  unsigned char mem[];
 } ArenaChunk;
 
 struct Arena {

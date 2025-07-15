@@ -184,6 +184,9 @@ typedef struct Parser {
 Parser* parser_create(Arena* arena, Lexer* lexer, ErrorList* errors);
 ASTNode* parser_parse_program(Parser* parser);
 
+// AST debugging
+void ast_print(ASTNode* ast);
+
 // IR types
 typedef enum { WASM_I32, WASM_I64, WASM_F32, WASM_F64, WASM_FUNCREF, WASM_EXTERNREF } WASMType;
 
@@ -283,6 +286,9 @@ typedef struct {
 
 // IR generation
 IRModule* ir_generate(Arena* arena, ASTNode* ast);
+
+// IR debugging
+void ir_print(IRModule* ir_module);
 
 // Code generation
 void codegen_emit_wasm(Arena* arena, IRModule* ir_module, const char* output_path);

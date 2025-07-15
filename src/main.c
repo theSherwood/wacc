@@ -28,12 +28,36 @@ static char* read_file(const char* path) {
 }
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    printf("Usage: %s <source.c>\n", argv[0]);
+  if (argc < 2) {
+    printf("Usage: %s [options] <source.c>\n", argv[0]);
+    printf("Options:\n");
+    printf("  --print-ast    Print the AST and exit\n");
+    printf("  --print-ir     Print the IR and exit\n");
     return 1;
   }
 
-  const char* input_path = argv[1];
+  bool print_ast = false;
+  bool print_ir = false;
+  const char* input_path = NULL;
+
+  // Parse command line arguments
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--print-ast") == 0) {
+      print_ast = true;
+    } else if (strcmp(argv[i], "--print-ir") == 0) {
+      print_ir = true;
+    } else if (input_path == NULL) {
+      input_path = argv[i];
+    } else {
+      printf("Error: Unknown option or multiple input files: %s\n", argv[i]);
+      return 1;
+    }
+  }
+
+  if (!input_path) {
+    printf("Error: No input file specified\n");
+    return 1;
+  }
 
   // Read source file
   char* source = read_file(input_path);
@@ -94,6 +118,14 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+  // Print AST if requested
+  if (print_ast) {
+    ast_print(ast);
+    arena_free(arena);
+    free(source);
+    return 0;
+  }
+
   // Generate IR
   IRModule* ir_module = ir_generate(arena, ast);
   if (!ir_module) {
@@ -101,6 +133,14 @@ int main(int argc, char* argv[]) {
     arena_free(arena);
     free(source);
     return 1;
+  }
+
+  // Print IR if requested
+  if (print_ir) {
+    ir_print(ir_module);
+    arena_free(arena);
+    free(source);
+    return 0;
   }
 
   // Generate WASM
