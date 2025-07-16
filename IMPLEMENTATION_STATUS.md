@@ -50,6 +50,7 @@
 ```
 
 **WASM Operations**:
+
 - `!` → `i32.eqz` (logical not)
 - `~` → `i32.const -1; i32.xor` (bitwise not)
 - `-` → `i32.const -1; i32.mul` (negation)
@@ -83,6 +84,7 @@
 ```
 
 **WASM Operations**:
+
 - `+` → `i32.add`
 - `-` → `i32.sub`
 - `*` → `i32.mul`
@@ -123,6 +125,7 @@
 ```
 
 **WASM Operations**:
+
 - Variable declarations → `local` declarations in WASM function
 - Variable access → `local.get`
 - Variable assignment → `local.set`
@@ -149,7 +152,8 @@
 - **Local Variables**: Proper WASM local variable management with index tracking
 - **Symbol Scoping**: Nested symbol tables for proper variable scoping
 
-**IR Design**: 
+**IR Design**:
+
 - Follows IR_OUTLINE.md design exactly
 - Stack-based evaluation matching WASM semantics
 - Structured control flow regions instead of basic blocks
@@ -157,6 +161,7 @@
 - Scoped symbol tables for variables
 
 **Generated IR Example**:
+
 ```
 function main() -> i32 {
   locals: $0:x, $1:y
@@ -184,13 +189,14 @@ function main() -> i32 {
 - **Symbol Table Management**: Proper scoped symbol tables for variable declarations and lookups
 - **Error Detection**: Detects and reports semantic errors with proper error codes:
   - Variable redefinition (ERROR_SEM_REDEFINITION - 3004)
-  - Undefined variables (ERROR_SEM_UNDEFINED_VARIABLE - 3001)  
+  - Undefined variables (ERROR_SEM_UNDEFINED_VARIABLE - 3001)
   - Use-before-declare errors
 - **Error Handling**: Uses proper ErrorList system with source location tracking
 - **Architecture**: Follows planned compiler architecture with separate phases
 - **Integration**: Added to main.c compilation pipeline between parsing and IR generation
 
 **Features**:
+
 - Scoped symbol table with parent scope lookup
 - Variable redefinition detection in current scope
 - Undefined variable detection across all parent scopes
@@ -198,8 +204,9 @@ function main() -> i32 {
 - Continues compilation through multiple errors for better error reporting
 
 **Testing**: All 77 tests pass including the 3 previously failing semantic error tests:
+
 - `tests/invalid/redefine.c` - now properly caught with ERROR_SEM_REDEFINITION
-- `tests/invalid/undeclared_var.c` - now properly caught with ERROR_SEM_UNDEFINED_VARIABLE  
+- `tests/invalid/undeclared_var.c` - now properly caught with ERROR_SEM_UNDEFINED_VARIABLE
 - `tests/invalid/var_declared_late.c` - now properly caught with ERROR_SEM_UNDEFINED_VARIABLE
 
 ## Next Steps
@@ -207,11 +214,13 @@ function main() -> i32 {
 ### Step 5: Control Flow (IN PROGRESS) 🔄
 
 **Completed**:
-- ✅ `if` statements and conditional execution  
+
+- ✅ `if` statements and conditional execution
 - ✅ Ternary operators (`? :`)
 - ✅ Fixed execution order bugs in WASM codegen
+- ✅ Add block statements and scoping
 
 **Remaining**:
-- Add block statements and scoping
+
 - Implement `while` loops
 - Use structured control flow regions for WASM compatibility
