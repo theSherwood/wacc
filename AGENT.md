@@ -13,10 +13,11 @@ Don't attempt anything more than 3 times. If you can't succeed after 3 attempts,
 - `make` - Build the compiler
 - `make clean` - Clean build artifacts
 - `make test` - Run the tests
+- `make <file.c> run` - Compiles a C file to WASM and runs it
+- `make <file.c> wat` - Prints the WAT for debugging
+- `make <file.c> ast` - Prints the AST for debugging
+- `make <file.c> ir` - Prints the IR for debugging
 - `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wasm)
-- `./wacc --print-ast <file.c>` - Prints the AST for debugging
-- `./wacc --print-ir <file.c>` - Prints the IR for debugging
-- `./wacc <file.c> && wasm2wat out.wasm` - Prints the WAT for debugging
 
 # When writing code
 
