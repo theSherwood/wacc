@@ -365,6 +365,7 @@ typedef enum {
 typedef struct Region {
     RegionType type;
     int id;
+    bool is_expression;          // True if this is an expression context (e.g., ternary)
     Instruction* instructions;
     size_t instruction_count;
     size_t instruction_capacity;

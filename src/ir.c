@@ -87,6 +87,7 @@ static Region* region_create(Arena* arena, RegionType type, int id, Region* pare
     Region* region = arena_alloc(arena, sizeof(Region));
     region->type = type;
     region->id = id;
+    region->is_expression = false;
     region->instructions = NULL;
     region->instruction_count = 0;
     region->instruction_capacity = 0;
@@ -282,6 +283,7 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
         case AST_TERNARY_EXPRESSION: {
             // Create IF region for ternary
             Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
+            if_region->is_expression = true;  // Mark as expression context
             region_add_child(ctx->arena, ctx->current_region, if_region);
             
             // Generate condition expression in the if region (pushes value to stack)

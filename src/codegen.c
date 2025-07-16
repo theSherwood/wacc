@@ -328,14 +328,11 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region) {
         // For IF regions, emit the structured control flow
         buffer_write_byte(buf, arena, WASM_IF);
         
-        // Determine result type based on context
-        // For now, always use i32 for expressions, void for statements  
-        if (region->data.if_data.then_region && region->data.if_data.else_region) {
-            // Both branches exist - likely ternary expression
-            buffer_write_byte(buf, arena, WASM_I32_TYPE);
+        // Use i32 result type for ternary expressions, void for if statements
+        if (region->is_expression) {
+            buffer_write_byte(buf, arena, WASM_I32_TYPE);  // i32 for ternary
         } else {
-            // Statement context - void
-            buffer_write_byte(buf, arena, 0x40);  // void
+            buffer_write_byte(buf, arena, 0x40);  // void for if statements
         }
         
         // Emit then branch
@@ -405,6 +402,13 @@ static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
         // Generate instructions from structured regions
         if (func->body) {
             emit_region(&func_body, arena, func->body);
+        }
+        
+        // Add default return for functions that return int
+        if (func->return_type.kind == TYPE_I32) {
+            buffer_write_byte(&func_body, arena, WASM_I32_CONST);
+            buffer_write_leb128_i32(&func_body, arena, 0);
+            buffer_write_byte(&func_body, arena, WASM_RETURN);
         }
         
         // End instruction
