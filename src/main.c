@@ -31,14 +31,16 @@ int main(int argc, char* argv[]) {
   if (argc < 2) {
     printf("Usage: %s [options] <source.c>\n", argv[0]);
     printf("Options:\n");
-    printf("  --print-ast    Print the AST and exit\n");
-    printf("  --print-ir     Print the IR and exit\n");
+    printf("  --print-ast          Print the AST and exit\n");
+    printf("  --print-ir           Print the IR and exit\n");
+    printf("  --output <path>      Specify output file path (default: out.wasm)\n");
     return 1;
   }
 
   bool print_ast = false;
   bool print_ir = false;
   const char* input_path = NULL;
+  const char* output_path = "out.wasm";  // default value
 
   // Parse command line arguments
   for (int i = 1; i < argc; i++) {
@@ -46,6 +48,13 @@ int main(int argc, char* argv[]) {
       print_ast = true;
     } else if (strcmp(argv[i], "--print-ir") == 0) {
       print_ir = true;
+    } else if ((strcmp(argv[i], "--output") == 0) || (strcmp(argv[i], "-o") == 0)) {
+      if (i + 1 < argc) {
+        output_path = argv[++i];
+      } else {
+        printf("Error: --output requires a path argument\n");
+        return 1;
+      }
     } else if (input_path == NULL) {
       input_path = argv[i];
     } else {
@@ -102,7 +111,7 @@ int main(int argc, char* argv[]) {
   }
 
   ASTNode* ast = parser_parse_program(parser);
-  
+
   // Print errors if any occurred
   if (error_list_has_errors(errors)) {
     error_list_print(errors, input_path);
@@ -110,7 +119,7 @@ int main(int argc, char* argv[]) {
     free(source);
     return 1;
   }
-  
+
   if (!ast) {
     printf("Error: Parse failed\n");
     arena_free(arena);
@@ -156,9 +165,9 @@ int main(int argc, char* argv[]) {
   }
 
   // Generate WASM
-  codegen_emit_wasm(arena, ir_module, "out.wasm");
+  codegen_emit_wasm(arena, ir_module, output_path);
 
-  printf("Compilation successful. Output written to out.wasm\n");
+  printf("Compilation successful. Output written to %s\n", output_path);
 
   // Cleanup
   arena_free(arena);
