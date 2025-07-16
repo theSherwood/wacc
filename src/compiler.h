@@ -7,63 +7,57 @@
 
 // Error handling system
 typedef struct {
-    const char* filename;
-    int line;
-    int column;
-    int start_pos;
-    int end_pos;
+  const char* filename;
+  int line;
+  int column;
+  int start_pos;
+  int end_pos;
 } SourceLocation;
 
-typedef enum {
-    ERROR_LEXICAL,
-    ERROR_SYNTAX,
-    ERROR_SEMANTIC,
-    ERROR_CODEGEN,
-    WARNING
-} ErrorLevel;
+typedef enum { ERROR_LEXICAL, ERROR_SYNTAX, ERROR_SEMANTIC, ERROR_CODEGEN, WARNING } ErrorLevel;
 
 typedef struct {
-    int id;
-    ErrorLevel level;
-    SourceLocation location;
-    const char* message;
-    const char* suggestion;  // Optional fix suggestion
-    const char* context;     // Relevant source line
+  int id;
+  ErrorLevel level;
+  SourceLocation location;
+  const char* message;
+  const char* suggestion;  // Optional fix suggestion
+  const char* context;     // Relevant source line
 } CompilerError;
 
 typedef struct {
-    CompilerError* errors;
-    size_t count;
-    size_t capacity;
-    bool has_fatal_errors;
+  CompilerError* errors;
+  size_t count;
+  size_t capacity;
+  bool has_fatal_errors;
 } ErrorList;
 
 // Error IDs - grouped by category
-#define ERROR_LEX_INVALID_CHARACTER        1001
-#define ERROR_LEX_UNTERMINATED_STRING      1002
-#define ERROR_LEX_UNTERMINATED_COMMENT     1003
-#define ERROR_LEX_INVALID_ESCAPE_SEQUENCE  1004
-#define ERROR_LEX_NUMBER_TOO_LARGE         1005
+#define ERROR_LEX_INVALID_CHARACTER 1001
+#define ERROR_LEX_UNTERMINATED_STRING 1002
+#define ERROR_LEX_UNTERMINATED_COMMENT 1003
+#define ERROR_LEX_INVALID_ESCAPE_SEQUENCE 1004
+#define ERROR_LEX_NUMBER_TOO_LARGE 1005
 
-#define ERROR_SYNTAX_EXPECTED_TOKEN        2001
-#define ERROR_SYNTAX_UNEXPECTED_TOKEN      2002
-#define ERROR_SYNTAX_MISSING_SEMICOLON     2003
-#define ERROR_SYNTAX_MISSING_BRACE         2004
-#define ERROR_SYNTAX_MISSING_PAREN         2005
-#define ERROR_SYNTAX_MALFORMED_EXPRESSION  2006
-#define ERROR_SYNTAX_EXPECTED_FUNCTION     2007
-#define ERROR_SYNTAX_EXPECTED_STATEMENT    2008
-#define ERROR_SYNTAX_EXPECTED_EXPRESSION   2009
-#define ERROR_SYNTAX_MISSING_OPERATOR      2010
+#define ERROR_SYNTAX_EXPECTED_TOKEN 2001
+#define ERROR_SYNTAX_UNEXPECTED_TOKEN 2002
+#define ERROR_SYNTAX_MISSING_SEMICOLON 2003
+#define ERROR_SYNTAX_MISSING_BRACE 2004
+#define ERROR_SYNTAX_MISSING_PAREN 2005
+#define ERROR_SYNTAX_MALFORMED_EXPRESSION 2006
+#define ERROR_SYNTAX_EXPECTED_FUNCTION 2007
+#define ERROR_SYNTAX_EXPECTED_STATEMENT 2008
+#define ERROR_SYNTAX_EXPECTED_EXPRESSION 2009
+#define ERROR_SYNTAX_MISSING_OPERATOR 2010
 
-#define ERROR_SEM_UNDEFINED_VARIABLE       3001
-#define ERROR_SEM_UNDEFINED_FUNCTION       3002
-#define ERROR_SEM_TYPE_MISMATCH            3003
-#define ERROR_SEM_REDEFINITION             3004
-#define ERROR_SEM_INVALID_ASSIGNMENT       3005
-#define ERROR_SEM_INVALID_CALL             3006
+#define ERROR_SEM_UNDEFINED_VARIABLE 3001
+#define ERROR_SEM_UNDEFINED_FUNCTION 3002
+#define ERROR_SEM_TYPE_MISMATCH 3003
+#define ERROR_SEM_REDEFINITION 3004
+#define ERROR_SEM_INVALID_ASSIGNMENT 3005
+#define ERROR_SEM_INVALID_CALL 3006
 
-#define ERROR_CODEGEN_WASM_LIMIT_EXCEEDED   4001
+#define ERROR_CODEGEN_WASM_LIMIT_EXCEEDED 4001
 #define ERROR_CODEGEN_INVALID_MEMORY_ACCESS 4002
 #define ERROR_CODEGEN_UNSUPPORTED_OPERATION 4003
 
@@ -75,9 +69,8 @@ void* arena_alloc(Arena* arena, size_t size);
 
 // Error handling functions
 ErrorList* error_list_create(Arena* arena);
-void error_list_add(ErrorList* errors, Arena* arena, int id, ErrorLevel level, 
-                   SourceLocation location, const char* message, const char* suggestion, 
-                   const char* context);
+void error_list_add(ErrorList* errors, Arena* arena, int id, ErrorLevel level, SourceLocation location,
+                    const char* message, const char* suggestion, const char* context);
 void error_list_print(ErrorList* errors, const char* filename);
 bool error_list_has_errors(ErrorList* errors);
 const char* get_source_context(Arena* arena, const char* source, int line);
@@ -105,26 +98,27 @@ typedef enum {
   TOKEN_CLOSE_BRACE,
   TOKEN_SEMICOLON,
   TOKEN_INTEGER_LITERAL,
-  TOKEN_BANG,        // !
-  TOKEN_TILDE,       // ~
-  TOKEN_MINUS,       // -
-  TOKEN_PLUS,        // +
-  TOKEN_STAR,        // *
-  TOKEN_SLASH,       // /
-  TOKEN_PERCENT,     // %
-  TOKEN_EQ,          // =
-  TOKEN_EQ_EQ,       // ==
-  TOKEN_BANG_EQ,     // !=
-  TOKEN_LT,          // <
-  TOKEN_GT,          // >
-  TOKEN_LT_EQ,       // <=
-  TOKEN_GT_EQ,       // >=
-  TOKEN_AMP_AMP,     // &&
-  TOKEN_PIPE_PIPE,   // ||
-  TOKEN_IF,          // if
-  TOKEN_ELSE,        // else
-  TOKEN_QUESTION,    // ?
-  TOKEN_COLON,       // :
+  TOKEN_BANG,       // !
+  TOKEN_TILDE,      // ~
+  TOKEN_MINUS,      // -
+  TOKEN_PLUS,       // +
+  TOKEN_STAR,       // *
+  TOKEN_SLASH,      // /
+  TOKEN_PERCENT,    // %
+  TOKEN_EQ,         // =
+  TOKEN_EQ_EQ,      // ==
+  TOKEN_BANG_EQ,    // !=
+  TOKEN_LT,         // <
+  TOKEN_GT,         // >
+  TOKEN_LT_EQ,      // <=
+  TOKEN_GT_EQ,      // >=
+  TOKEN_AMP_AMP,    // &&
+  TOKEN_PIPE_PIPE,  // ||
+  TOKEN_IF,         // if
+  TOKEN_ELSE,       // else
+  TOKEN_WHILE,      // while
+  TOKEN_QUESTION,   // ?
+  TOKEN_COLON,      // :
   TOKEN_ERROR
 } TokenType;
 
@@ -151,18 +145,19 @@ Token lexer_next_token(Lexer* lexer);
 
 // AST nodes
 typedef enum {
-    AST_PROGRAM,
-    AST_FUNCTION,
-    AST_RETURN_STATEMENT,
-    AST_INTEGER_CONSTANT,
-    AST_UNARY_OP,
-    AST_BINARY_OP,
-    AST_VARIABLE_DECL,
-    AST_VARIABLE_REF,
-    AST_ASSIGNMENT,
-    AST_IF_STATEMENT,
-    AST_TERNARY_EXPRESSION,
-    AST_COMPOUND_STATEMENT
+  AST_PROGRAM,
+  AST_FUNCTION,
+  AST_RETURN_STATEMENT,
+  AST_INTEGER_CONSTANT,
+  AST_UNARY_OP,
+  AST_BINARY_OP,
+  AST_VARIABLE_DECL,
+  AST_VARIABLE_REF,
+  AST_ASSIGNMENT,
+  AST_IF_STATEMENT,
+  AST_WHILE_STATEMENT,
+  AST_TERNARY_EXPRESSION,
+  AST_COMPOUND_STATEMENT
 } ASTNodeType;
 
 typedef struct ASTNode {
@@ -201,22 +196,26 @@ typedef struct ASTNode {
       const char* name;
     } variable_ref;
     struct {
-        const char* name;
-        struct ASTNode* value;
+      const char* name;
+      struct ASTNode* value;
     } assignment;
     struct {
-        struct ASTNode* condition;
-        struct ASTNode* then_statement;
-        struct ASTNode* else_statement;  // Can be NULL
+      struct ASTNode* condition;
+      struct ASTNode* then_statement;
+      struct ASTNode* else_statement;  // Can be NULL
     } if_statement;
     struct {
-        struct ASTNode* condition;
-        struct ASTNode* true_expression;
-        struct ASTNode* false_expression;
+      struct ASTNode* condition;
+      struct ASTNode* body;
+    } while_statement;
+    struct {
+      struct ASTNode* condition;
+      struct ASTNode* true_expression;
+      struct ASTNode* false_expression;
     } ternary_expression;
     struct {
-        struct ASTNode** statements;
-        int statement_count;
+      struct ASTNode** statements;
+      int statement_count;
     } compound_statement;
   } data;
 } ASTNode;
@@ -236,189 +235,229 @@ ASTNode* parser_parse_program(Parser* parser);
 void ast_print(ASTNode* ast);
 
 // IR types - WASM native types
-typedef enum {
-    WASM_I32,
-    WASM_I64,
-    WASM_F32,
-    WASM_F64,
-    WASM_FUNCREF,
-    WASM_EXTERNREF
-} WASMType;
+typedef enum { WASM_I32, WASM_I64, WASM_F32, WASM_F64, WASM_FUNCREF, WASM_EXTERNREF } WASMType;
 
 // C99 types (for optimization and validation)
 typedef enum {
-    TYPE_VOID,
-    TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64,
-    TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64,
-    TYPE_F32, TYPE_F64,
-    TYPE_POINTER,      // Lowered to i32 (linear memory offset)
-    TYPE_ARRAY,        // Lowered to pointer + size info
-    TYPE_STRUCT,       // Lowered to multiple values or memory
-    TYPE_FUNCTION      // Lowered to function table index
+  TYPE_VOID,
+  TYPE_I8,
+  TYPE_I16,
+  TYPE_I32,
+  TYPE_I64,
+  TYPE_U8,
+  TYPE_U16,
+  TYPE_U32,
+  TYPE_U64,
+  TYPE_F32,
+  TYPE_F64,
+  TYPE_POINTER,  // Lowered to i32 (linear memory offset)
+  TYPE_ARRAY,    // Lowered to pointer + size info
+  TYPE_STRUCT,   // Lowered to multiple values or memory
+  TYPE_FUNCTION  // Lowered to function table index
 } TypeKind;
 
 typedef struct Type {
-    TypeKind kind;
-    WASMType wasm_type;    // Corresponding WASM type
-    size_t size;           // Size in bytes
-    size_t alignment;      // Alignment requirement
-    union {
-        struct {
-            struct Type* element_type;
-            size_t element_count;
-        } array;
-        struct {
-            struct Type* pointee_type;
-        } pointer;
-        struct {
-            struct Type* return_type;
-            struct Type* param_types;
-            size_t param_count;
-        } function;
-        struct {
-            struct Type* field_types;
-            size_t field_count;
-            size_t* field_offsets;
-        } struct_info;
-    } details;
+  TypeKind kind;
+  WASMType wasm_type;  // Corresponding WASM type
+  size_t size;         // Size in bytes
+  size_t alignment;    // Alignment requirement
+  union {
+    struct {
+      struct Type* element_type;
+      size_t element_count;
+    } array;
+    struct {
+      struct Type* pointee_type;
+    } pointer;
+    struct {
+      struct Type* return_type;
+      struct Type* param_types;
+      size_t param_count;
+    } function;
+    struct {
+      struct Type* field_types;
+      size_t field_count;
+      size_t* field_offsets;
+    } struct_info;
+  } details;
 } Type;
 
 // IR Opcodes - Stack-based WASM-oriented instructions
 typedef enum {
-    // Arithmetic
-    IR_ADD, IR_SUB, IR_MUL, IR_DIV, IR_MOD,
-    IR_NEG, IR_NOT, IR_BITWISE_AND, IR_BITWISE_OR, IR_BITWISE_XOR, IR_BITWISE_NOT,
+  // Arithmetic
+  IR_ADD,
+  IR_SUB,
+  IR_MUL,
+  IR_DIV,
+  IR_MOD,
+  IR_NEG,
+  IR_NOT,
+  IR_BITWISE_AND,
+  IR_BITWISE_OR,
+  IR_BITWISE_XOR,
+  IR_BITWISE_NOT,
 
-    // Comparison
-    IR_EQ, IR_NE, IR_LT, IR_LE, IR_GT, IR_GE,
+  // Comparison
+  IR_EQ,
+  IR_NE,
+  IR_LT,
+  IR_LE,
+  IR_GT,
+  IR_GE,
 
-    // Logical
-    IR_LOGICAL_AND, IR_LOGICAL_OR, IR_LOGICAL_NOT,
+  // Logical
+  IR_LOGICAL_AND,
+  IR_LOGICAL_OR,
+  IR_LOGICAL_NOT,
 
-    // Memory
-    IR_LOAD, IR_STORE, IR_LOAD_GLOBAL, IR_STORE_GLOBAL,
-    IR_ALLOCA, IR_LOAD_LOCAL, IR_STORE_LOCAL,
-    IR_STACK_SAVE, IR_STACK_RESTORE, IR_MEMCPY, IR_MEMSET,
+  // Memory
+  IR_LOAD,
+  IR_STORE,
+  IR_LOAD_GLOBAL,
+  IR_STORE_GLOBAL,
+  IR_ALLOCA,
+  IR_LOAD_LOCAL,
+  IR_STORE_LOCAL,
+  IR_STACK_SAVE,
+  IR_STACK_RESTORE,
+  IR_MEMCPY,
+  IR_MEMSET,
 
-    // Control Flow
-    IR_BLOCK, IR_LOOP, IR_IF, IR_ELSE, IR_END,
-    IR_BREAK, IR_CONTINUE, IR_RETURN, IR_CALL, IR_CALL_INDIRECT,
+  // Control Flow
+  IR_BLOCK,
+  IR_LOOP,
+  IR_IF,
+  IR_ELSE,
+  IR_END,
+  IR_BREAK,
+  IR_CONTINUE,
+  IR_RETURN,
+  IR_CALL,
+  IR_CALL_INDIRECT,
 
-    // Constants
-    IR_CONST_INT, IR_CONST_FLOAT, IR_CONST_STRING,
+  // Constants
+  IR_CONST_INT,
+  IR_CONST_FLOAT,
+  IR_CONST_STRING,
 
-    // Type conversions
-    IR_CAST, IR_TRUNCATE, IR_EXTEND,
+  // Type conversions
+  IR_CAST,
+  IR_TRUNCATE,
+  IR_EXTEND,
 
-    // Stack operations (for expression evaluation)
-    IR_PUSH, IR_POP, IR_DUP,
+  // Stack operations (for expression evaluation)
+  IR_PUSH,
+  IR_POP,
+  IR_DUP,
 
-    // WASM-specific
-    IR_UNREACHABLE, IR_NOP, IR_SELECT
+  // WASM-specific
+  IR_UNREACHABLE,
+  IR_NOP,
+  IR_SELECT
 } IROpcode;
 
 // Operand types
 typedef enum {
-    OPERAND_REGISTER,     // Virtual register
-    OPERAND_CONSTANT,     // Immediate value
-    OPERAND_LOCAL,        // Local variable
-    OPERAND_GLOBAL,       // Global variable
-    OPERAND_MEMORY,       // Memory address
-    OPERAND_LABEL         // Branch target
+  OPERAND_REGISTER,  // Virtual register
+  OPERAND_CONSTANT,  // Immediate value
+  OPERAND_LOCAL,     // Local variable
+  OPERAND_GLOBAL,    // Global variable
+  OPERAND_MEMORY,    // Memory address
+  OPERAND_LABEL      // Branch target
 } OperandType;
 
 typedef struct {
-    int int_value;
-    float float_value;
+  int int_value;
+  float float_value;
 } ConstantValue;
 
 typedef struct {
-    OperandType type;
-    Type value_type;
-    union {
-        int reg;              // Virtual register number
-        ConstantValue constant;
-        int local_index;
-        int global_index;
-        int memory_offset;
-        int label_id;
-    } value;
+  OperandType type;
+  Type value_type;
+  union {
+    int reg;  // Virtual register number
+    ConstantValue constant;
+    int local_index;
+    int global_index;
+    int memory_offset;
+    int label_id;
+  } value;
 } Operand;
 
 // Stack-based instruction
 typedef struct {
-    IROpcode opcode;
-    Type result_type;
-    Operand operands[3];  // Maximum 3 operands
-    int operand_count;
-    int result_reg;       // Virtual register for result (-1 if stack-based)
+  IROpcode opcode;
+  Type result_type;
+  Operand operands[3];  // Maximum 3 operands
+  int operand_count;
+  int result_reg;  // Virtual register for result (-1 if stack-based)
 } Instruction;
 
 // Structured control flow regions
 typedef enum {
-    REGION_BLOCK,      // Linear sequence of instructions
-    REGION_LOOP,       // Loop construct
-    REGION_IF,         // If-then-else construct
-    REGION_FUNCTION    // Function body
+  REGION_BLOCK,    // Linear sequence of instructions
+  REGION_LOOP,     // Loop construct
+  REGION_IF,       // If-then-else construct
+  REGION_FUNCTION  // Function body
 } RegionType;
 
 typedef struct Region {
-    RegionType type;
-    int id;
-    bool is_expression;          // True if this is an expression context (e.g., ternary)
-    Instruction* instructions;
-    size_t instruction_count;
-    size_t instruction_capacity;
-    struct Region** children;    // Nested regions
-    size_t child_count;
-    size_t child_capacity;
-    struct Region* parent;       // Parent region
+  RegionType type;
+  int id;
+  bool is_expression;  // True if this is an expression context (e.g., ternary)
+  Instruction* instructions;
+  size_t instruction_count;
+  size_t instruction_capacity;
+  struct Region** children;  // Nested regions
+  size_t child_count;
+  size_t child_capacity;
+  struct Region* parent;  // Parent region
 
-    // For control flow
-    union {
-        struct {
-            struct Region* then_region;
-            struct Region* else_region;
-        } if_data;
-        struct {
-            struct Region* body;
-        } loop_data;
-    } data;
+  // For control flow
+  union {
+    struct {
+      struct Region* then_region;
+      struct Region* else_region;
+    } if_data;
+    struct {
+      struct Region* body;
+    } loop_data;
+  } data;
 } Region;
 
 // Local variable
 typedef struct {
-    const char* name;
-    Type type;
-    int index;
-    bool is_stack_based;  // True if allocated on simulated stack vs WASM local
+  const char* name;
+  Type type;
+  int index;
+  bool is_stack_based;  // True if allocated on simulated stack vs WASM local
 } LocalVariable;
 
 // Function parameter
 typedef struct {
-    const char* name;
-    Type type;
-    int index;
+  const char* name;
+  Type type;
+  int index;
 } Parameter;
 
 // IR Function with structured regions
 typedef struct {
-    const char* name;
-    Type return_type;
-    Parameter* parameters;
-    size_t param_count;
-    Region* body;                // Function body as root region
-    LocalVariable* locals;
-    size_t local_count;
-    size_t local_capacity;
-    int max_stack_size;          // For stack simulation
+  const char* name;
+  Type return_type;
+  Parameter* parameters;
+  size_t param_count;
+  Region* body;  // Function body as root region
+  LocalVariable* locals;
+  size_t local_count;
+  size_t local_capacity;
+  int max_stack_size;  // For stack simulation
 } Function;
 
 // IR Module
 typedef struct {
-    Function* functions;
-    size_t function_count;
-    size_t function_capacity;
+  Function* functions;
+  size_t function_count;
+  size_t function_capacity;
 } IRModule;
 
 // Semantic analysis

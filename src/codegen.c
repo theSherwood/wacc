@@ -348,6 +348,42 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region) {
         
         // End the if
         buffer_write_byte(buf, arena, WASM_END);
+    } else if (region->type == REGION_LOOP) {
+        // For LOOP regions, emit the structured control flow
+        // Block for break (outer block)
+        buffer_write_byte(buf, arena, WASM_BLOCK);
+        buffer_write_byte(buf, arena, 0x40);  // void block
+        
+        // Loop for continue (inner loop)
+        buffer_write_byte(buf, arena, WASM_LOOP);
+        buffer_write_byte(buf, arena, 0x40);  // void loop
+        
+        // Emit condition expression (should be in this region)
+        for (size_t i = 0; i < region->instruction_count; i++) {
+            emit_instruction(buf, arena, &region->instructions[i]);
+        }
+        
+        // Logical not condition (break if false)
+        buffer_write_byte(buf, arena, WASM_I32_EQZ);
+        
+        // Break out of outer block if condition is false
+        buffer_write_byte(buf, arena, WASM_BR_IF);
+        buffer_write_byte(buf, arena, 1);  // depth 1 (outer block)
+        
+        // Emit body
+        if (region->data.loop_data.body) {
+            emit_region(buf, arena, region->data.loop_data.body);
+        }
+        
+        // Continue loop (branch back to loop start)
+        buffer_write_byte(buf, arena, WASM_BR);
+        buffer_write_byte(buf, arena, 0);  // depth 0 (inner loop)
+        
+        // End loop
+        buffer_write_byte(buf, arena, WASM_END);
+        
+        // End block
+        buffer_write_byte(buf, arena, WASM_END);
     } else {
         // For FUNCTION regions, emit child regions first (statements processed first)
         // For other region types, emit instructions first, then child regions

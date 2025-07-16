@@ -454,6 +454,29 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
             break;
         }
         
+        case AST_WHILE_STATEMENT: {
+            // Create LOOP region for the while statement
+            Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, loop_region);
+            
+            // Generate condition expression and body in the loop region
+            ctx->current_region = loop_region;
+            ir_generate_expression(ctx, stmt->data.while_statement.condition);
+            ctx->current_region = loop_region->parent;
+            
+            // Create body region
+            Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
+            loop_region->data.loop_data.body = body_region;
+            region_add_child(ctx->arena, loop_region, body_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = body_region;
+            ir_generate_statement(ctx, stmt->data.while_statement.body);
+            ctx->current_region = old_region;
+            
+            break;
+        }
+        
         case AST_COMPOUND_STATEMENT: {
             // Create a new scope for the compound statement
             SymbolTable* previous_scope = ctx->current_scope;

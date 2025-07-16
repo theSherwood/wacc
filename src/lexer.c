@@ -52,9 +52,12 @@ static TokenType get_keyword_type(const char* start, size_t length) {
         return TOKEN_IF;
     }
     if (length == 4 && str_ncmp(start, "else", 4) == 0) {
-        return TOKEN_ELSE;
+    return TOKEN_ELSE;
     }
-    return TOKEN_IDENTIFIER;
+    if (length == 5 && str_ncmp(start, "while", 5) == 0) {
+       return TOKEN_WHILE;
+   }
+   return TOKEN_IDENTIFIER;
 }
 
 Token lexer_next_token(Lexer* lexer) {

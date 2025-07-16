@@ -222,5 +222,47 @@ function main() -> i32 {
 
 **Remaining**:
 
-- Implement `while` loops
-- Use structured control flow regions for WASM compatibility
+- ✅ Implement `while` loops
+- ✅ Use structured control flow regions for WASM compatibility
+
+**Step 5 Complete! ✅**
+
+### While Loop Implementation Details:
+
+**Implemented Features**:
+
+- **Lexer**: Recognizes `while` keyword (`TOKEN_WHILE`)
+- **Parser**: Handles while loop grammar with `parse_while_statement()`
+- **AST**: `AST_WHILE_STATEMENT` node with condition and body fields
+- **IR**: `REGION_LOOP` with structured control flow using body region
+- **Codegen**: Generates WASM block/loop/br structure for proper while loop semantics
+
+**Grammar Implemented**:
+
+```
+<statement> ::= ... | <while_statement>
+<while_statement> ::= "while" "(" <exp> ")" <statement>
+```
+
+**WASM Structure**:
+
+The while loop generates the following WASM structured control flow:
+```
+block         ; outer block for break
+  loop        ; inner loop for continue
+    <condition>
+    i32.eqz     ; logical not
+    br_if 1     ; break out of block if condition is false
+    <body>
+    br 0        ; continue loop
+  end
+end
+```
+
+**Testing**: Added 4 comprehensive test cases:
+- Basic while loop counting
+- Countdown loop
+- Nested while loops
+- No-iteration case (false condition)
+
+All 80 tests pass, maintaining backward compatibility.

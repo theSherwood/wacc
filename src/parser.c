@@ -437,6 +437,37 @@ static ASTNode* parse_if_statement(Parser* parser) {
     return node;
 }
 
+static ASTNode* parse_while_statement(Parser* parser) {
+    if (!match_token(parser, TOKEN_WHILE)) {
+        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
+        return NULL;
+    }
+
+    if (!match_token(parser, TOKEN_OPEN_PAREN)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
+        return NULL;
+    }
+
+    ASTNode* condition = parse_expression(parser);
+    if (!condition) return NULL;
+
+    if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
+        return NULL;
+    }
+
+    ASTNode* body = parse_statement(parser);
+    if (!body) return NULL;
+
+    ASTNode* node = create_ast_node(parser, AST_WHILE_STATEMENT);
+    if (!node) return NULL;
+
+    node->data.while_statement.condition = condition;
+    node->data.while_statement.body = body;
+
+    return node;
+}
+
 static ASTNode* parse_compound_statement(Parser* parser) {
     if (!match_token(parser, TOKEN_OPEN_BRACE)) {
         report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
@@ -484,12 +515,16 @@ static ASTNode* parse_statement(Parser* parser) {
   }
 
   if (parser->current_token.type == TOKEN_IF) {
-        return parse_if_statement(parser);
+  return parse_if_statement(parser);
   }
 
-  if (parser->current_token.type == TOKEN_OPEN_BRACE) {
-        return parse_compound_statement(parser);
+  if (parser->current_token.type == TOKEN_WHILE) {
+  return parse_while_statement(parser);
   }
+
+   if (parser->current_token.type == TOKEN_OPEN_BRACE) {
+        return parse_compound_statement(parser);
+   }
 
   if (match_token(parser, TOKEN_RETURN)) {
     ASTNode* node = create_ast_node(parser, AST_RETURN_STATEMENT);

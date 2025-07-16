@@ -1,3 +1,5 @@
+We are building a compiler for a subset of C99 to WASM. We are implementing the compiler in C99.
+
 Refer to @IMPLEMENTATION_PLAN.md for the implementation plan.
 
 Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it up to date when you make changes.
