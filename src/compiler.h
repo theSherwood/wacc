@@ -56,6 +56,7 @@ typedef struct {
 #define ERROR_SEM_REDEFINITION 3004
 #define ERROR_SEM_INVALID_ASSIGNMENT 3005
 #define ERROR_SEM_INVALID_CALL 3006
+#define ERROR_SEM_BREAK_OUTSIDE_LOOP 3007
 
 #define ERROR_CODEGEN_WASM_LIMIT_EXCEEDED 4001
 #define ERROR_CODEGEN_INVALID_MEMORY_ACCESS 4002
@@ -117,6 +118,7 @@ typedef enum {
   TOKEN_IF,         // if
   TOKEN_ELSE,       // else
   TOKEN_WHILE,      // while
+  TOKEN_BREAK,      // break
   TOKEN_QUESTION,   // ?
   TOKEN_COLON,      // :
   TOKEN_ERROR
@@ -156,6 +158,7 @@ typedef enum {
   AST_ASSIGNMENT,
   AST_IF_STATEMENT,
   AST_WHILE_STATEMENT,
+  AST_BREAK_STATEMENT,
   AST_TERNARY_EXPRESSION,
   AST_COMPOUND_STATEMENT
 } ASTNodeType;
@@ -208,6 +211,9 @@ typedef struct ASTNode {
       struct ASTNode* condition;
       struct ASTNode* body;
     } while_statement;
+    struct {
+      // Break statements have no additional data
+    } break_statement;
     struct {
       struct ASTNode* condition;
       struct ASTNode* true_expression;

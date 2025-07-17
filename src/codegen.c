@@ -182,7 +182,12 @@ static void emit_export_section(Buffer* buf, Arena* arena) {
     buf->size += content.size;
 }
 
-static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
+// Context for tracking if nesting depth during code generation
+typedef struct CodegenContext {
+    int if_depth;  // Current nesting depth within if statements
+} CodegenContext;
+
+static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst, CodegenContext* ctx) {
     switch (inst->opcode) {
         case IR_CONST_INT: {
             buffer_write_byte(buf, arena, WASM_I32_CONST);
@@ -306,6 +311,14 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
             buffer_write_byte(buf, arena, WASM_DROP);
             break;
         }
+        case IR_BREAK: {
+            // For break statements, branch index = number of if statements + 1
+            // This accounts for if statements between the break and the loop's outer block
+            int break_depth = ctx->if_depth + 1;
+            buffer_write_byte(buf, arena, WASM_BR);
+            buffer_write_leb128_u32(buf, arena, break_depth);
+            break;
+        }
         case IR_RETURN: {
             buffer_write_byte(buf, arena, WASM_RETURN);
             break;
@@ -316,13 +329,13 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst) {
     }
 }
 
-static void emit_region(Buffer* buf, Arena* arena, Region* region) {
+static void emit_region(Buffer* buf, Arena* arena, Region* region, CodegenContext* ctx) {
     if (!region) return;
     
     if (region->type == REGION_IF) {
         // First emit instructions in this region (includes condition)
         for (size_t i = 0; i < region->instruction_count; i++) {
-            emit_instruction(buf, arena, &region->instructions[i]);
+            emit_instruction(buf, arena, &region->instructions[i], ctx);
         }
         
         // For IF regions, emit the structured control flow
@@ -335,15 +348,19 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region) {
             buffer_write_byte(buf, arena, 0x40);  // void for if statements
         }
         
-        // Emit then branch
+        // Emit then branch with increased if depth
         if (region->data.if_data.then_region) {
-            emit_region(buf, arena, region->data.if_data.then_region);
+            ctx->if_depth++;
+            emit_region(buf, arena, region->data.if_data.then_region, ctx);
+            ctx->if_depth--;
         }
         
-        // Emit else branch if present
+        // Emit else branch if present with increased if depth  
         if (region->data.if_data.else_region) {
             buffer_write_byte(buf, arena, WASM_ELSE);
-            emit_region(buf, arena, region->data.if_data.else_region);
+            ctx->if_depth++;
+            emit_region(buf, arena, region->data.if_data.else_region, ctx);
+            ctx->if_depth--;
         }
         
         // End the if
@@ -360,7 +377,7 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region) {
         
         // Emit condition expression (should be in this region)
         for (size_t i = 0; i < region->instruction_count; i++) {
-            emit_instruction(buf, arena, &region->instructions[i]);
+            emit_instruction(buf, arena, &region->instructions[i], ctx);
         }
         
         // Logical not condition (break if false)
@@ -370,9 +387,9 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region) {
         buffer_write_byte(buf, arena, WASM_BR_IF);
         buffer_write_byte(buf, arena, 1);  // depth 1 (outer block)
         
-        // Emit body
+        // Emit body (if_depth doesn't change for loop body)
         if (region->data.loop_data.body) {
-            emit_region(buf, arena, region->data.loop_data.body);
+            emit_region(buf, arena, region->data.loop_data.body, ctx);
         }
         
         // Continue loop (branch back to loop start)
@@ -390,22 +407,22 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region) {
         if (region->type == REGION_FUNCTION) {
             // Emit child regions first (control flow statements)
             for (size_t i = 0; i < region->child_count; i++) {
-                emit_region(buf, arena, region->children[i]);
+                emit_region(buf, arena, region->children[i], ctx);
             }
             
             // Then emit function-level instructions
             for (size_t i = 0; i < region->instruction_count; i++) {
-                emit_instruction(buf, arena, &region->instructions[i]);
+                emit_instruction(buf, arena, &region->instructions[i], ctx);
             }
         } else {
             // For other region types, emit instructions normally
             for (size_t i = 0; i < region->instruction_count; i++) {
-                emit_instruction(buf, arena, &region->instructions[i]);
+                emit_instruction(buf, arena, &region->instructions[i], ctx);
             }
             
             // Emit child regions
             for (size_t i = 0; i < region->child_count; i++) {
-                emit_region(buf, arena, region->children[i]);
+                emit_region(buf, arena, region->children[i], ctx);
             }
         }
     }
@@ -437,7 +454,8 @@ static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
 
         // Generate instructions from structured regions
         if (func->body) {
-            emit_region(&func_body, arena, func->body);
+            CodegenContext ctx = {0};  // Initialize if_depth to 0
+            emit_region(&func_body, arena, func->body, &ctx);
         }
         
         // Add default return for functions that return int

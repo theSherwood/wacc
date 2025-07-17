@@ -57,6 +57,9 @@ static TokenType get_keyword_type(const char* start, size_t length) {
     if (length == 5 && str_ncmp(start, "while", 5) == 0) {
        return TOKEN_WHILE;
    }
+   if (length == 5 && str_ncmp(start, "break", 5) == 0) {
+       return TOKEN_BREAK;
+   }
    return TOKEN_IDENTIFIER;
 }
 

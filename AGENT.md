@@ -10,6 +10,27 @@ Tests should be added to the `tests` directory. Tests in `tests/invalid` are for
 
 Don't attempt anything more than 3 times. If you can't succeed after 3 attempts, let me know so I can help.
 
+# Directory Structure
+
+- scripts/
+  - ...
+- src/
+  - compiler.h
+  - main.c
+  - lexer.c
+  - parser.c
+  - semantic.c
+  - ir.c
+  - codegen.c
+  - arena.c
+  - error.c
+  - utils.c
+- tests/
+  - invalid/
+    - ...
+  - runtime/
+    - ...
+
 # Build Commands
 
 - `make` - Build the compiler

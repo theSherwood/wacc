@@ -477,6 +477,18 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
             break;
         }
         
+        case AST_BREAK_STATEMENT: {
+            // Generate IR_BREAK instruction to exit the loop
+            Instruction instr = {0};
+            instr.opcode = IR_BREAK;
+            instr.result_type = create_void_type();
+            instr.operand_count = 0;
+            instr.result_reg = -1;  // No result register for break
+            
+            region_add_instruction(ctx->arena, ctx->current_region, instr);
+            break;
+        }
+        
         case AST_COMPOUND_STATEMENT: {
             // Create a new scope for the compound statement
             SymbolTable* previous_scope = ctx->current_scope;
@@ -629,6 +641,7 @@ static const char* ir_opcode_to_string(IROpcode opcode) {
         case IR_LOAD_LOCAL: return "local.get";
         case IR_STORE_LOCAL: return "local.set";
         case IR_RETURN: return "return";
+        case IR_BREAK: return "br";
         case IR_POP: return "drop";
         case IR_DUP: return "dup";
         case IR_BLOCK: return "block";

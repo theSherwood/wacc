@@ -74,6 +74,7 @@ static ASTNode* parse_unary(Parser* parser);
 static ASTNode* parse_primary(Parser* parser);
 static ASTNode* parse_statement(Parser* parser);
 static ASTNode* parse_if_statement(Parser* parser);
+static ASTNode* parse_break_statement(Parser* parser);
 static ASTNode* parse_compound_statement(Parser* parser);
 
 static ASTNode* parse_primary(Parser* parser) {
@@ -468,6 +469,31 @@ static ASTNode* parse_while_statement(Parser* parser) {
     return node;
 }
 
+static ASTNode* parse_break_statement(Parser* parser) {
+    // Capture the position of the break token before consuming it
+    int line = parser->current_token.line;
+    int column = parser->current_token.column;
+    
+    if (!match_token(parser, TOKEN_BREAK)) {
+        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'break'", "add 'break' keyword");
+        return NULL;
+    }
+
+    if (!match_token(parser, TOKEN_SEMICOLON)) {
+        report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'break'", "add ';'");
+        return NULL;
+    }
+
+    ASTNode* node = create_ast_node(parser, AST_BREAK_STATEMENT);
+    if (!node) return NULL;
+    
+    // Override the line and column to use the break token's position
+    node->line = line;
+    node->column = column;
+
+    return node;
+}
+
 static ASTNode* parse_compound_statement(Parser* parser) {
     if (!match_token(parser, TOKEN_OPEN_BRACE)) {
         report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
@@ -520,6 +546,10 @@ static ASTNode* parse_statement(Parser* parser) {
 
   if (parser->current_token.type == TOKEN_WHILE) {
   return parse_while_statement(parser);
+  }
+
+  if (parser->current_token.type == TOKEN_BREAK) {
+    return parse_break_statement(parser);
   }
 
    if (parser->current_token.type == TOKEN_OPEN_BRACE) {
@@ -780,6 +810,20 @@ static void ast_print_node(ASTNode* node, int depth) {
         ast_print_indent(depth + 1);
         printf("False:\n");
         ast_print_node(node->data.ternary_expression.false_expression, depth + 2);
+        break;
+
+    case AST_WHILE_STATEMENT:
+        printf("While Statement\n");
+        ast_print_indent(depth + 1);
+        printf("Condition:\n");
+        ast_print_node(node->data.while_statement.condition, depth + 2);
+        ast_print_indent(depth + 1);
+        printf("Body:\n");
+        ast_print_node(node->data.while_statement.body, depth + 2);
+        break;
+
+    case AST_BREAK_STATEMENT:
+        printf("Break Statement\n");
         break;
 
     case AST_COMPOUND_STATEMENT:

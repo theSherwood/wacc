@@ -14,6 +14,7 @@ typedef struct SemanticContext {
     Arena* arena;
     ErrorList* errors;
     SymbolTable* current_scope;
+    bool in_loop;  // Track if we're currently inside a loop
 } SemanticContext;
 
 // Symbol table operations
@@ -224,6 +225,41 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
             return success;
         }
         
+        case AST_WHILE_STATEMENT: {
+            bool success = true;
+            
+            // Analyze the condition
+            if (!analyze_expression(ctx, stmt->data.while_statement.condition)) {
+                success = false;
+            }
+            
+            // Set loop context and analyze the body
+            bool previous_in_loop = ctx->in_loop;
+            ctx->in_loop = true;
+            
+            if (!analyze_statement(ctx, stmt->data.while_statement.body)) {
+                success = false;
+            }
+            
+            // Restore previous loop context
+            ctx->in_loop = previous_in_loop;
+            
+            return success;
+        }
+        
+        case AST_BREAK_STATEMENT: {
+            // Check if we're inside a loop
+            if (!ctx->in_loop) {
+                report_semantic_error(ctx, ERROR_SEM_BREAK_OUTSIDE_LOOP, 
+                                     "break statement not within a loop", 
+                                     "use break only inside while loops",
+                                     stmt->line, stmt->column);
+                return false;
+            }
+            
+            return true;
+        }
+        
         default:
             // Other statement types (like expression statements) 
             return analyze_expression(ctx, stmt);
@@ -241,6 +277,7 @@ bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors) {
     ctx.arena = arena;
     ctx.errors = errors;
     ctx.current_scope = symbol_table_create(arena, NULL);
+    ctx.in_loop = false;
     
     if (!ctx.current_scope) {
         return false;
