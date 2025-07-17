@@ -478,6 +478,13 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
         }
         
         case AST_BREAK_STATEMENT: {
+            // Create a block region for the break statement to maintain order
+            Region* break_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+            region_add_child(ctx->arena, ctx->current_region, break_region);
+            
+            Region* old_region = ctx->current_region;
+            ctx->current_region = break_region;
+            
             // Generate IR_BREAK instruction to exit the loop
             Instruction instr = {0};
             instr.opcode = IR_BREAK;
@@ -486,6 +493,8 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
             instr.result_reg = -1;  // No result register for break
             
             region_add_instruction(ctx->arena, ctx->current_region, instr);
+            
+            ctx->current_region = old_region;
             break;
         }
         
