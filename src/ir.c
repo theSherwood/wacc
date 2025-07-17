@@ -593,14 +593,6 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
     ir_generate_statement(&ctx, function_node->data.function.statements[i]);
   }
 
-  // Add implicit return 0
-  Operand operand = {0};
-  operand.type = OPERAND_CONSTANT;
-  operand.value_type = func->return_type;
-  operand.value.constant.int_value = 0;
-  emit_instruction(&ctx, IR_CONST_INT, func->return_type, &operand, 1);
-  emit_instruction(&ctx, IR_RETURN, create_void_type(), NULL, 0);
-
   return module;
 }
 
