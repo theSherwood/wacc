@@ -236,6 +236,7 @@ typedef struct Parser {
   Token current_token;
   Arena* arena;
   ErrorList* errors;
+  ASTNode* ast;
 } Parser;
 
 Parser* parser_create(Arena* arena, Lexer* lexer, ErrorList* errors);

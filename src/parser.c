@@ -36,8 +36,11 @@ static void report_error(Parser* parser, int error_id, const char* message, cons
 static void synchronize(Parser* parser) {
   // Skip tokens until we reach a synchronization point
   while (parser->current_token.type != TOKEN_EOF) {
-    if (parser->current_token.type == TOKEN_SEMICOLON || parser->current_token.type == TOKEN_OPEN_BRACE ||
-        parser->current_token.type == TOKEN_CLOSE_BRACE) {
+    if (parser->current_token.type == TOKEN_SEMICOLON) {
+      advance_token(parser);
+      return;
+    }
+    if (parser->current_token.type == TOKEN_OPEN_BRACE || parser->current_token.type == TOKEN_CLOSE_BRACE) {
       return;
     }
     advance_token(parser);
@@ -571,6 +574,10 @@ static ASTNode* parse_compound_statement(Parser* parser) {
 }
 
 static ASTNode* parse_statement(Parser* parser) {
+  if (parser->current_token.type == TOKEN_SEMICOLON) {
+    return NULL;
+  }
+
   if (parser->current_token.type == TOKEN_INT) {
     return parse_declaration(parser);
   }
@@ -627,12 +634,8 @@ static ASTNode* parse_statement(Parser* parser) {
                  "remove the extra 'else' clause");
     advance_token(parser);  // Skip the 'else' token
     // Skip the statement that follows the else
-    while (parser->current_token.type != TOKEN_SEMICOLON && parser->current_token.type != TOKEN_EOF) {
-      advance_token(parser);
-    }
-    if (parser->current_token.type == TOKEN_SEMICOLON) {
-      advance_token(parser);  // Consume the semicolon
-    }
+    parse_statement(parser);
+
     return NULL;
   }
 
@@ -722,6 +725,8 @@ static ASTNode* parse_function(Parser* parser) {
 ASTNode* parser_parse_program(Parser* parser) {
   ASTNode* node = create_ast_node(parser, AST_PROGRAM);
   if (!node) return NULL;
+
+  parser->ast = node;
 
   node->data.program.function = parse_function(parser);
   if (!node->data.program.function) {
