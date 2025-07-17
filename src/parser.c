@@ -444,6 +444,51 @@ static ASTNode* parse_if_statement(Parser* parser) {
   return node;
 }
 
+static ASTNode* parse_do_while_statement(Parser* parser) {
+  if (!match_token(parser, TOKEN_DO)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'do'", "add 'do' keyword");
+    return NULL;
+  }
+
+  ASTNode* body = parse_statement(parser);
+  if (!body) return NULL;
+
+  if (!match_token(parser, TOKEN_WHILE)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
+    synchronize(parser);
+    return NULL;
+  }
+
+  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
+    synchronize(parser);
+    return NULL;
+  }
+
+  ASTNode* condition = parse_expression(parser);
+  if (!condition) return NULL;
+
+  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
+    synchronize(parser);
+    return NULL;
+  }
+
+  if (!match_token(parser, TOKEN_SEMICOLON)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'do'", "add ';' after 'do'");
+    synchronize(parser);
+    return NULL;
+  }
+
+  ASTNode* node = create_ast_node(parser, AST_DO_STATEMENT);
+  if (!node) return NULL;
+
+  node->data.do_while_statement.body = body;
+  node->data.do_while_statement.condition = condition;
+
+  return node;
+}
+
 static ASTNode* parse_while_statement(Parser* parser) {
   if (!match_token(parser, TOKEN_WHILE)) {
     report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
@@ -578,6 +623,10 @@ static ASTNode* parse_statement(Parser* parser) {
 
   if (parser->current_token.type == TOKEN_IF) {
     return parse_if_statement(parser);
+  }
+
+  if (parser->current_token.type == TOKEN_DO) {
+    return parse_do_while_statement(parser);
   }
 
   if (parser->current_token.type == TOKEN_WHILE) {

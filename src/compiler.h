@@ -119,6 +119,7 @@ typedef enum {
   TOKEN_PIPE_PIPE,  // ||
   TOKEN_IF,         // if
   TOKEN_ELSE,       // else
+  TOKEN_DO,         // do
   TOKEN_WHILE,      // while
   TOKEN_BREAK,      // break
   TOKEN_CONTINUE,   // continue
@@ -160,6 +161,7 @@ typedef enum {
   AST_VARIABLE_REF,
   AST_ASSIGNMENT,
   AST_IF_STATEMENT,
+  AST_DO_STATEMENT,
   AST_WHILE_STATEMENT,
   AST_BREAK_STATEMENT,
   AST_CONTINUE_STATEMENT,
@@ -211,6 +213,10 @@ typedef struct ASTNode {
       struct ASTNode* then_statement;
       struct ASTNode* else_statement;  // Can be NULL
     } if_statement;
+    struct {
+      struct ASTNode* body;
+      struct ASTNode* condition;
+    } do_while_statement;
     struct {
       struct ASTNode* condition;
       struct ASTNode* body;

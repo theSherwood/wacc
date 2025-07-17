@@ -51,6 +51,9 @@ static TokenType get_keyword_type(const char* start, size_t length) {
   if (length == 2 && str_ncmp(start, "if", 2) == 0) {
     return TOKEN_IF;
   }
+  if (length == 2 && str_ncmp(start, "do", 2) == 0) {
+    return TOKEN_DO;
+  }
   if (length == 4 && str_ncmp(start, "else", 4) == 0) {
     return TOKEN_ELSE;
   }

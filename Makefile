@@ -16,23 +16,29 @@ test:
 	./scripts/test_all.sh
 
 test_runtime:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./scripts/test_runtime.sh
 
 test_invalid:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./scripts/test_invalid.sh
 
 run:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./wacc $(F)
 	node test_wasm.js
 
 wat:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./wacc $(F)
 	wasm2wat out.wasm
 
 ast:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./wacc --print-ast $(F)
 
 ir:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./wacc --print-ir $(F)
 
 .PHONY: all clean test
