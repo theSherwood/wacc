@@ -228,7 +228,7 @@ Refer to https://norasandler.com/2017/12/05/Write-a-Compiler-2.html
 - **Lexer**: Recognize unary operators
 - **Parser**: Handle operator precedence for unary expressions
 - **AST**: Add `UnaryOp(operator, operand)` node
-- **IR**: Add `IR_NEG`, `IR_NOT`, `IR_BITWISE_NOT` instructions and virtual register system
+- **IR**: Add `IR_NEG`, `IR_NOT`, `IR_BITWISE_NOT` instructions
 - **Codegen**: Generate appropriate WASM instructions (i32.eqz, i32.sub, etc.) from IR
 
 **Grammar additions**:

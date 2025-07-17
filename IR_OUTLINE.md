@@ -102,7 +102,6 @@ typedef struct {
     Type result_type;
     Operand operands[3];  // Maximum 3 operands
     int operand_count;
-    int result_reg;       // Virtual register for result
 } Instruction;
 ```
 
@@ -110,7 +109,6 @@ typedef struct {
 
 ```c
 typedef enum {
-    OPERAND_REGISTER,     // Virtual register
     OPERAND_CONSTANT,     // Immediate value
     OPERAND_LOCAL,        // Local variable
     OPERAND_GLOBAL,       // Global variable
@@ -122,7 +120,6 @@ typedef struct {
     OperandType type;
     Type value_type;
     union {
-        int reg;              // Virtual register number
         ConstantValue constant;
         int local_index;
         int global_index;
@@ -285,13 +282,6 @@ function factorial(i32 %n) -> i32 {
 ```
 
 ## WASM Code Generation
-
-### Register Allocation
-
-- Virtual registers map to WASM local variables
-- Temporary values use the evaluation stack
-- Function parameters become WASM parameters
-- Stack variables allocated in linear memory
 
 ### Instruction Mapping
 

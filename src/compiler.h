@@ -364,7 +364,6 @@ typedef enum {
 
 // Operand types
 typedef enum {
-  OPERAND_REGISTER,  // Virtual register
   OPERAND_CONSTANT,  // Immediate value
   OPERAND_LOCAL,     // Local variable
   OPERAND_GLOBAL,    // Global variable
@@ -381,7 +380,6 @@ typedef struct {
   OperandType type;
   Type value_type;
   union {
-    int reg;  // Virtual register number
     ConstantValue constant;
     int local_index;
     int global_index;
@@ -396,7 +394,6 @@ typedef struct {
   Type result_type;
   Operand operands[3];  // Maximum 3 operands
   int operand_count;
-  int result_reg;  // Virtual register for result (-1 if stack-based)
 } Instruction;
 
 // Structured control flow regions
