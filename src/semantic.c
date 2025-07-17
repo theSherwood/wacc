@@ -203,6 +203,28 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
         success = false;
       }
 
+      // Check if the then statement is a variable declaration without braces
+      if (stmt->data.if_statement.then_statement && 
+          stmt->data.if_statement.then_statement->type == AST_VARIABLE_DECL) {
+        report_semantic_error(ctx, ERROR_SEM_DEPENDENT_STATEMENT_ASSIGNMENT, 
+                              "variable declaration cannot be used as dependent statement",
+                              "use braces {} to create a compound statement", 
+                              stmt->data.if_statement.then_statement->line, 
+                              stmt->data.if_statement.then_statement->column);
+        success = false;
+      }
+
+      // Check if the else statement is a variable declaration without braces
+      if (stmt->data.if_statement.else_statement && 
+          stmt->data.if_statement.else_statement->type == AST_VARIABLE_DECL) {
+        report_semantic_error(ctx, ERROR_SEM_DEPENDENT_STATEMENT_ASSIGNMENT, 
+                              "variable declaration cannot be used as dependent statement",
+                              "use braces {} to create a compound statement", 
+                              stmt->data.if_statement.else_statement->line, 
+                              stmt->data.if_statement.else_statement->column);
+        success = false;
+      }
+
       // Analyze the then statement
       if (!analyze_statement(ctx, stmt->data.if_statement.then_statement)) {
         success = false;
