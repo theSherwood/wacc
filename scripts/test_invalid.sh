@@ -47,6 +47,7 @@ run_test() {
             
             if [ "$all_matched" = true ] && [ "$actual_count" -eq "$expected_count" ]; then
                 # echo "$test_name: PASS" > "$tmp_subdir/result.txt"
+                # do nothing
                 TOTAL=$TOTAL
             else
                 echo "----------------------------" > "$tmp_subdir/result.txt"

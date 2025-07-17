@@ -24,7 +24,9 @@ run_test() {
                 # Run the WASM file; adjust test_wasm.js to accept a wasm file path or copy it to cwd
                 actual_output=$(node test_wasm.js "$tmp_subdir/out.wasm" 2>/dev/null)
                 if [ "$actual_output" = "$expected_output" ]; then
-                    echo "$test_name: PASS" > "$tmp_subdir/result.txt"
+                    # echo "$test_name: PASS" > "$tmp_subdir/result.txt"
+                    # do nothing
+                    TOTAL=$TOTAL
                 else
                     echo "$test_name: FAIL - expected $expected_output, got $actual_output" > "$tmp_subdir/result.txt"
                 fi

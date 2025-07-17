@@ -391,14 +391,8 @@ static ASTNode* parse_declaration(Parser* parser) {
   // Check for optional initializer
   if (match_token(parser, TOKEN_EQ)) {
     node->data.variable_decl.initializer = parse_expression(parser);
-    if (!node->data.variable_decl.initializer) {
-      // Error in parsing initializer, consume tokens until we find a clear synchronization point
-      while (parser->current_token.type != TOKEN_SEMICOLON && parser->current_token.type != TOKEN_ELSE &&
-             parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
-        advance_token(parser);
-      }
-      node->data.variable_decl.initializer = NULL;
-    }
+    // Error in parsing initializer
+    if (!node->data.variable_decl.initializer) return node;
   } else {
     node->data.variable_decl.initializer = NULL;
   }
