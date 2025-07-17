@@ -88,6 +88,8 @@ void error_list_print(ErrorList* errors, const char* filename) {
         if (error->suggestion) {
             printf("note: %s\n", error->suggestion);
         }
+
+        printf("\n");
     }
 }
 

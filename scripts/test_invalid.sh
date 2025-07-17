@@ -46,16 +46,23 @@ run_test() {
             actual_count=$(echo "$output" | grep -c "error:")
             
             if [ "$all_matched" = true ] && [ "$actual_count" -eq "$expected_count" ]; then
-                echo "$test_name: PASS" > "$tmp_subdir/result.txt"
+                # echo "$test_name: PASS" > "$tmp_subdir/result.txt"
+                TOTAL=$TOTAL
             else
-                echo "$test_name: FAIL - expected $expected_count errors, got $actual_count" > "$tmp_subdir/result.txt"
+                echo "----------------------------" > "$tmp_subdir/result.txt"
+                echo "$test_name: FAIL - expected $expected_count errors, got $actual_count" >> "$tmp_subdir/result.txt"
+                echo "--Expected:" >> "$tmp_subdir/result.txt"
+                echo "$expected_errors" >> "$tmp_subdir/result.txt"
+                echo "" >> "$tmp_subdir/result.txt"
                 if [ "$all_matched" = false ]; then
                     echo "  Missing:$missing_errors" >> "$tmp_subdir/result.txt"
                 fi
-                echo "  Got: $output" >> "$tmp_subdir/result.txt"
+                echo "--Recieved:" >> "$tmp_subdir/result.txt"
+                echo "$output" >> "$tmp_subdir/result.txt"
             fi
         else
-            echo "$test_name: FAIL - no expected error information found" > "$tmp_subdir/result.txt"
+            echo "----------------------------" > "$tmp_subdir/result.txt"
+            echo "$test_name: FAIL - no expected error information found" >> "$tmp_subdir/result.txt"
         fi
     fi
 }

@@ -29,7 +29,8 @@ static void report_error(Parser* parser, int error_id, const char* message, cons
       .start_pos = parser->current_token.start - parser->lexer->source,
       .end_pos = parser->current_token.start - parser->lexer->source + parser->current_token.length};
 
-  error_list_add(parser->errors, NULL, error_id, ERROR_SYNTAX, location, message, suggestion, NULL);
+  const char* context = get_source_context(parser->arena, parser->lexer->source, parser->current_token.line);
+  error_list_add(parser->errors, NULL, error_id, ERROR_SYNTAX, location, message, suggestion, context);
 }
 
 static void synchronize(Parser* parser) {
@@ -89,7 +90,8 @@ static ASTNode* parse_primary(Parser* parser) {
     advance_token(parser);
 
     if (parser->current_token.type == TOKEN_OPEN_PAREN) {
-      report_error(parser, 3006, "missing operator before parenthesis", "insert an operator like `+` or `*`");
+      report_error(parser, ERROR_SYNTAX_MISSING_OPERATOR, "missing operator before parenthesis",
+                   "insert an operator like `+` or `*`");
       advance_token(parser);  // Advance past the problematic token
       return NULL;
     }
@@ -386,14 +388,22 @@ static ASTNode* parse_declaration(Parser* parser) {
   // Check for optional initializer
   if (match_token(parser, TOKEN_EQ)) {
     node->data.variable_decl.initializer = parse_expression(parser);
-    if (!node->data.variable_decl.initializer) return NULL;
+    if (!node->data.variable_decl.initializer) {
+      // Error in parsing initializer, consume tokens until we find a clear synchronization point
+      while (parser->current_token.type != TOKEN_SEMICOLON && parser->current_token.type != TOKEN_ELSE &&
+             parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
+        advance_token(parser);
+      }
+      node->data.variable_decl.initializer = NULL;
+    }
   } else {
     node->data.variable_decl.initializer = NULL;
   }
 
   if (!match_token(parser, TOKEN_SEMICOLON)) {
     report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after declaration", "add a semicolon");
-    return NULL;
+    synchronize(parser);
+    // Still return the declaration node so the variable gets registered
   }
 
   return node;
@@ -613,8 +623,16 @@ static ASTNode* parse_statement(Parser* parser) {
 
   // Check for mismatched else clause
   if (parser->current_token.type == TOKEN_ELSE) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_STATEMENT, "unexpected 'else' without matching 'if'", "remove the extra 'else' clause");
-    synchronize(parser);
+    report_error(parser, ERROR_SYNTAX_EXPECTED_STATEMENT, "unexpected 'else' without matching 'if'",
+                 "remove the extra 'else' clause");
+    advance_token(parser);  // Skip the 'else' token
+    // Skip the statement that follows the else
+    while (parser->current_token.type != TOKEN_SEMICOLON && parser->current_token.type != TOKEN_EOF) {
+      advance_token(parser);
+    }
+    if (parser->current_token.type == TOKEN_SEMICOLON) {
+      advance_token(parser);  // Consume the semicolon
+    }
     return NULL;
   }
 

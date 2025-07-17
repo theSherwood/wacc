@@ -15,7 +15,8 @@ typedef struct SemanticContext {
   Arena* arena;
   ErrorList* errors;
   SymbolTable* current_scope;
-  bool in_loop;  // Track if we're currently inside a loop
+  bool in_loop;        // Track if we're currently inside a loop
+  const char* source;  // Source code for context
 } SemanticContext;
 
 // Symbol table operations
@@ -84,7 +85,8 @@ static void report_semantic_error(SemanticContext* ctx, int error_id, const char
                              .start_pos = 0,
                              .end_pos = 0};
 
-  error_list_add(ctx->errors, ctx->arena, error_id, ERROR_SEMANTIC, location, message, suggestion, NULL);
+  const char* context = get_source_context(ctx->arena, ctx->source, line);
+  error_list_add(ctx->errors, ctx->arena, error_id, ERROR_SEMANTIC, location, message, suggestion, context);
 }
 
 // Forward declarations
@@ -204,24 +206,20 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       }
 
       // Check if the then statement is a variable declaration without braces
-      if (stmt->data.if_statement.then_statement && 
-          stmt->data.if_statement.then_statement->type == AST_VARIABLE_DECL) {
-        report_semantic_error(ctx, ERROR_SEM_DEPENDENT_STATEMENT_ASSIGNMENT, 
-                              "variable declaration cannot be used as dependent statement",
-                              "use braces {} to create a compound statement", 
-                              stmt->data.if_statement.then_statement->line, 
-                              stmt->data.if_statement.then_statement->column);
+      if (stmt->data.if_statement.then_statement && stmt->data.if_statement.then_statement->type == AST_VARIABLE_DECL) {
+        report_semantic_error(
+            ctx, ERROR_SEM_DEPENDENT_STATEMENT_ASSIGNMENT, "variable declaration cannot be used as dependent statement",
+            "use braces {} to create a compound statement", stmt->data.if_statement.then_statement->line,
+            stmt->data.if_statement.then_statement->column);
         success = false;
       }
 
       // Check if the else statement is a variable declaration without braces
-      if (stmt->data.if_statement.else_statement && 
-          stmt->data.if_statement.else_statement->type == AST_VARIABLE_DECL) {
-        report_semantic_error(ctx, ERROR_SEM_DEPENDENT_STATEMENT_ASSIGNMENT, 
-                              "variable declaration cannot be used as dependent statement",
-                              "use braces {} to create a compound statement", 
-                              stmt->data.if_statement.else_statement->line, 
-                              stmt->data.if_statement.else_statement->column);
+      if (stmt->data.if_statement.else_statement && stmt->data.if_statement.else_statement->type == AST_VARIABLE_DECL) {
+        report_semantic_error(
+            ctx, ERROR_SEM_DEPENDENT_STATEMENT_ASSIGNMENT, "variable declaration cannot be used as dependent statement",
+            "use braces {} to create a compound statement", stmt->data.if_statement.else_statement->line,
+            stmt->data.if_statement.else_statement->column);
         success = false;
       }
 
@@ -289,7 +287,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
 }
 
 // Main semantic analysis function
-bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors) {
+bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors, const char* source) {
   if (!ast || ast->type != AST_PROGRAM) {
     return false;
   }
@@ -300,6 +298,7 @@ bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors) {
   ctx.errors = errors;
   ctx.current_scope = symbol_table_create(arena, NULL);
   ctx.in_loop = false;
+  ctx.source = source;
 
   if (!ctx.current_scope) {
     return false;

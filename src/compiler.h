@@ -468,7 +468,7 @@ typedef struct {
 } IRModule;
 
 // Semantic analysis
-bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors);
+bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors, const char* source);
 
 // IR generation
 IRModule* ir_generate(Arena* arena, ASTNode* ast);

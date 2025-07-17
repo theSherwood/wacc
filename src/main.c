@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Perform semantic analysis
-  if (!semantic_analyze(arena, ast, errors)) {
+  if (!semantic_analyze(arena, ast, errors, source)) {
     if (error_list_has_errors(errors)) {
       error_list_print(errors, input_path);
     } else {
