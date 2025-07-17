@@ -610,6 +610,14 @@ static ASTNode* parse_statement(Parser* parser) {
     synchronize(parser);
     return NULL;
   }
+
+  // Check for mismatched else clause
+  if (parser->current_token.type == TOKEN_ELSE) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_STATEMENT, "unexpected 'else' without matching 'if'", "remove the extra 'else' clause");
+    synchronize(parser);
+    return NULL;
+  }
+
   // Fallback to expression statement (for assignments)
   ASTNode* expr = parse_expression(parser);
   if (!expr) return NULL;

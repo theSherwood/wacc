@@ -38,7 +38,7 @@ run_test() {
                 echo "  Got: $output" >> "$tmp_subdir/result.txt"
             fi
         else
-            echo "$test_name: PASS" > "$tmp_subdir/result.txt"
+            echo "$test_name: FAIL - no expected error information found" > "$tmp_subdir/result.txt"
         fi
     fi
 }
