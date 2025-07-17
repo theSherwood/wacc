@@ -16,4 +16,4 @@ int main() {
     return x + y;
 }
 
-// Expected: 5
+// Expected: 12
