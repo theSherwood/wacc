@@ -89,30 +89,30 @@ static ASTNode* parse_primary(Parser* parser) {
     advance_token(parser);
 
     if (parser->current_token.type == TOKEN_OPEN_PAREN) {
-        report_error(parser, 3006, "missing operator before parenthesis", "insert an operator like `+` or `*`");
-        advance_token(parser); // Advance past the problematic token
-        return NULL;
+      report_error(parser, 3006, "missing operator before parenthesis", "insert an operator like `+` or `*`");
+      advance_token(parser);  // Advance past the problematic token
+      return NULL;
     }
 
     return node;
   }
 
-    if (parser->current_token.type == TOKEN_IDENTIFIER) {
-        // Treat identifiers as variable references
-        ASTNode* node = create_ast_node(parser, AST_VARIABLE_REF);
-        if (!node) return NULL;
+  if (parser->current_token.type == TOKEN_IDENTIFIER) {
+    // Treat identifiers as variable references
+    ASTNode* node = create_ast_node(parser, AST_VARIABLE_REF);
+    if (!node) return NULL;
 
-        // Copy identifier name
-        size_t name_len = parser->current_token.length;
-        char* name = arena_alloc(parser->arena, name_len + 1);
-        if (!name) return NULL;
-        str_ncpy(name, parser->current_token.start, name_len);
-        name[name_len] = '\0';
-        node->data.variable_ref.name = name;
+    // Copy identifier name
+    size_t name_len = parser->current_token.length;
+    char* name = arena_alloc(parser->arena, name_len + 1);
+    if (!name) return NULL;
+    str_ncpy(name, parser->current_token.start, name_len);
+    name[name_len] = '\0';
+    node->data.variable_ref.name = name;
 
-        advance_token(parser);
-        return node;
-    }
+    advance_token(parser);
+    return node;
+  }
 
   // Handle parentheses
   if (match_token(parser, TOKEN_OPEN_PAREN)) {
@@ -303,56 +303,56 @@ static ASTNode* parse_logical_or(Parser* parser) {
 }
 
 static ASTNode* parse_ternary_expression(Parser* parser) {
-    ASTNode* condition = parse_logical_or(parser);
-    if (!condition) return NULL;
+  ASTNode* condition = parse_logical_or(parser);
+  if (!condition) return NULL;
 
-    if (match_token(parser, TOKEN_QUESTION)) {
-        ASTNode* true_expr = parse_expression(parser);
-        if (!true_expr) return NULL;
+  if (match_token(parser, TOKEN_QUESTION)) {
+    ASTNode* true_expr = parse_expression(parser);
+    if (!true_expr) return NULL;
 
-        if (!match_token(parser, TOKEN_COLON)) {
-            report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected ':' in ternary expression", "add ':'");
-            return NULL;
-        }
-
-        ASTNode* false_expr = parse_ternary_expression(parser); // Right-associative
-        if (!false_expr) return NULL;
-
-        ASTNode* node = create_ast_node(parser, AST_TERNARY_EXPRESSION);
-        if (!node) return NULL;
-
-        node->data.ternary_expression.condition = condition;
-        node->data.ternary_expression.true_expression = true_expr;
-        node->data.ternary_expression.false_expression = false_expr;
-
-        return node;
+    if (!match_token(parser, TOKEN_COLON)) {
+      report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected ':' in ternary expression", "add ':'");
+      return NULL;
     }
 
-    return condition;
+    ASTNode* false_expr = parse_ternary_expression(parser);  // Right-associative
+    if (!false_expr) return NULL;
+
+    ASTNode* node = create_ast_node(parser, AST_TERNARY_EXPRESSION);
+    if (!node) return NULL;
+
+    node->data.ternary_expression.condition = condition;
+    node->data.ternary_expression.true_expression = true_expr;
+    node->data.ternary_expression.false_expression = false_expr;
+
+    return node;
+  }
+
+  return condition;
 }
 
 static ASTNode* parse_assignment_expression(Parser* parser) {
-    ASTNode* left = parse_ternary_expression(parser);
+  ASTNode* left = parse_ternary_expression(parser);
 
-    if (match_token(parser, TOKEN_EQ)) {
-        ASTNode* right = parse_assignment_expression(parser); // Right-associative
-        if (!right) return NULL;
+  if (match_token(parser, TOKEN_EQ)) {
+    ASTNode* right = parse_assignment_expression(parser);  // Right-associative
+    if (!right) return NULL;
 
-        // Check if the left side is a valid assignment target (l-value)
-        if (left->type != AST_VARIABLE_REF) {
-            report_error(parser, ERROR_SEM_INVALID_ASSIGNMENT, "invalid assignment target", "target must be a variable");
-            return NULL;
-        }
-
-        ASTNode* node = create_ast_node(parser, AST_ASSIGNMENT);
-        if (!node) return NULL;
-
-        node->data.assignment.name = left->data.variable_ref.name;
-        node->data.assignment.value = right;
-        return node;
+    // Check if the left side is a valid assignment target (l-value)
+    if (left->type != AST_VARIABLE_REF) {
+      report_error(parser, ERROR_SEM_INVALID_ASSIGNMENT, "invalid assignment target", "target must be a variable");
+      return NULL;
     }
 
-    return left;
+    ASTNode* node = create_ast_node(parser, AST_ASSIGNMENT);
+    if (!node) return NULL;
+
+    node->data.assignment.name = left->data.variable_ref.name;
+    node->data.assignment.value = right;
+    return node;
+  }
+
+  return left;
 }
 
 static ASTNode* parse_expression(Parser* parser) {
@@ -360,201 +360,230 @@ static ASTNode* parse_expression(Parser* parser) {
 }
 
 static ASTNode* parse_declaration(Parser* parser) {
-    if (!match_token(parser, TOKEN_INT)) {
-        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'int' type specifier", "add 'int'");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_INT)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'int' type specifier", "add 'int'");
+    return NULL;
+  }
 
-    if (parser->current_token.type != TOKEN_IDENTIFIER) {
-        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected identifier after type", "add a variable name");
-        return NULL;
-    }
+  if (parser->current_token.type != TOKEN_IDENTIFIER) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected identifier after type", "add a variable name");
+    return NULL;
+  }
 
-    ASTNode* node = create_ast_node(parser, AST_VARIABLE_DECL);
-    if (!node) return NULL;
+  ASTNode* node = create_ast_node(parser, AST_VARIABLE_DECL);
+  if (!node) return NULL;
 
-    // Copy identifier name
-    size_t name_len = parser->current_token.length;
-    char* name = arena_alloc(parser->arena, name_len + 1);
-    if (!name) return NULL;
-    str_ncpy(name, parser->current_token.start, name_len);
-    name[name_len] = '\0';
-    node->data.variable_decl.name = name;
+  // Copy identifier name
+  size_t name_len = parser->current_token.length;
+  char* name = arena_alloc(parser->arena, name_len + 1);
+  if (!name) return NULL;
+  str_ncpy(name, parser->current_token.start, name_len);
+  name[name_len] = '\0';
+  node->data.variable_decl.name = name;
 
-    advance_token(parser);
+  advance_token(parser);
 
-    // Check for optional initializer
-    if (match_token(parser, TOKEN_EQ)) {
-        node->data.variable_decl.initializer = parse_expression(parser);
-        if (!node->data.variable_decl.initializer) return NULL;
-    } else {
-        node->data.variable_decl.initializer = NULL;
-    }
+  // Check for optional initializer
+  if (match_token(parser, TOKEN_EQ)) {
+    node->data.variable_decl.initializer = parse_expression(parser);
+    if (!node->data.variable_decl.initializer) return NULL;
+  } else {
+    node->data.variable_decl.initializer = NULL;
+  }
 
-    if (!match_token(parser, TOKEN_SEMICOLON)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after declaration", "add a semicolon");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_SEMICOLON)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after declaration", "add a semicolon");
+    return NULL;
+  }
 
-    return node;
+  return node;
 }
 
-
 static ASTNode* parse_if_statement(Parser* parser) {
-    if (!match_token(parser, TOKEN_IF)) {
-        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'if'", "add 'if' keyword");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_IF)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'if'", "add 'if' keyword");
+    return NULL;
+  }
 
-    if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('");
+    return NULL;
+  }
 
-    ASTNode* condition = parse_expression(parser);
-    if (!condition) return NULL;
+  ASTNode* condition = parse_expression(parser);
+  if (!condition) return NULL;
 
-    if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after if condition", "add ')'");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after if condition", "add ')'");
+    return NULL;
+  }
 
-    ASTNode* then_statement = parse_statement(parser);
-    if (!then_statement) return NULL;
+  ASTNode* then_statement = parse_statement(parser);
+  if (!then_statement) return NULL;
 
-    ASTNode* else_statement = NULL;
-    if (match_token(parser, TOKEN_ELSE)) {
-        else_statement = parse_statement(parser);
-        if (!else_statement) return NULL;
-    }
+  ASTNode* else_statement = NULL;
+  if (match_token(parser, TOKEN_ELSE)) {
+    else_statement = parse_statement(parser);
+    if (!else_statement) return NULL;
+  }
 
-    ASTNode* node = create_ast_node(parser, AST_IF_STATEMENT);
-    if (!node) return NULL;
+  ASTNode* node = create_ast_node(parser, AST_IF_STATEMENT);
+  if (!node) return NULL;
 
-    node->data.if_statement.condition = condition;
-    node->data.if_statement.then_statement = then_statement;
-    node->data.if_statement.else_statement = else_statement;
+  node->data.if_statement.condition = condition;
+  node->data.if_statement.then_statement = then_statement;
+  node->data.if_statement.else_statement = else_statement;
 
-    return node;
+  return node;
 }
 
 static ASTNode* parse_while_statement(Parser* parser) {
-    if (!match_token(parser, TOKEN_WHILE)) {
-        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_WHILE)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
+    return NULL;
+  }
 
-    if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
+    return NULL;
+  }
 
-    ASTNode* condition = parse_expression(parser);
-    if (!condition) return NULL;
+  ASTNode* condition = parse_expression(parser);
+  if (!condition) return NULL;
 
-    if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
+    return NULL;
+  }
 
-    ASTNode* body = parse_statement(parser);
-    if (!body) return NULL;
+  ASTNode* body = parse_statement(parser);
+  if (!body) return NULL;
 
-    ASTNode* node = create_ast_node(parser, AST_WHILE_STATEMENT);
-    if (!node) return NULL;
+  ASTNode* node = create_ast_node(parser, AST_WHILE_STATEMENT);
+  if (!node) return NULL;
 
-    node->data.while_statement.condition = condition;
-    node->data.while_statement.body = body;
+  node->data.while_statement.condition = condition;
+  node->data.while_statement.body = body;
 
-    return node;
+  return node;
 }
 
 static ASTNode* parse_break_statement(Parser* parser) {
-    // Capture the position of the break token before consuming it
-    int line = parser->current_token.line;
-    int column = parser->current_token.column;
-    
-    if (!match_token(parser, TOKEN_BREAK)) {
-        report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'break'", "add 'break' keyword");
-        return NULL;
-    }
+  // Capture the position of the break token before consuming it
+  int line = parser->current_token.line;
+  int column = parser->current_token.column;
 
-    if (!match_token(parser, TOKEN_SEMICOLON)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'break'", "add ';'");
-        return NULL;
-    }
+  if (!match_token(parser, TOKEN_BREAK)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'break'", "add 'break' keyword");
+    return NULL;
+  }
 
-    ASTNode* node = create_ast_node(parser, AST_BREAK_STATEMENT);
-    if (!node) return NULL;
-    
-    // Override the line and column to use the break token's position
-    node->line = line;
-    node->column = column;
+  if (!match_token(parser, TOKEN_SEMICOLON)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'break'", "add ';'");
+    return NULL;
+  }
 
-    return node;
+  ASTNode* node = create_ast_node(parser, AST_BREAK_STATEMENT);
+  if (!node) return NULL;
+
+  // Override the line and column to use the break token's position
+  node->line = line;
+  node->column = column;
+
+  return node;
+}
+
+static ASTNode* parse_continue_statement(Parser* parser) {
+  // Capture the position of the continue token before consuming it
+  int line = parser->current_token.line;
+  int column = parser->current_token.column;
+
+  if (!match_token(parser, TOKEN_CONTINUE)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'continue'", "add 'continue' keyword");
+    return NULL;
+  }
+
+  if (!match_token(parser, TOKEN_SEMICOLON)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'continue'", "add ';'");
+    return NULL;
+  }
+
+  ASTNode* node = create_ast_node(parser, AST_CONTINUE_STATEMENT);
+  if (!node) return NULL;
+
+  // Override the line and column to use the continue token's position
+  node->line = line;
+  node->column = column;
+
+  return node;
 }
 
 static ASTNode* parse_compound_statement(Parser* parser) {
-    if (!match_token(parser, TOKEN_OPEN_BRACE)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
+  if (!match_token(parser, TOKEN_OPEN_BRACE)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
+    return NULL;
+  }
+
+  ASTNode* node = create_ast_node(parser, AST_COMPOUND_STATEMENT);
+  if (!node) return NULL;
+
+  // Allocate space for statements
+  node->data.compound_statement.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
+  node->data.compound_statement.statement_count = 0;
+
+  // Parse statements until we hit the closing brace
+  while (parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
+    Token prev_token = parser->current_token;  // Save current position
+    ASTNode* stmt = parse_statement(parser);
+    if (stmt) {
+      if (node->data.compound_statement.statement_count >= MAX_STATEMENTS) {
+        report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "too many statements in block",
+                     "reduce number of statements");
         return NULL;
+      }
+      node->data.compound_statement.statements[node->data.compound_statement.statement_count++] = stmt;
+    } else {
+      // Error in parsing statement, synchronize and continue
+      synchronize(parser);
+      // If we haven't advanced, force advance to avoid infinite loop
+      if (parser->current_token.start == prev_token.start) {
+        advance_token(parser);
+      }
     }
+  }
 
-    ASTNode* node = create_ast_node(parser, AST_COMPOUND_STATEMENT);
-    if (!node) return NULL;
+  if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
+    return NULL;
+  }
 
-    // Allocate space for statements
-    node->data.compound_statement.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
-    node->data.compound_statement.statement_count = 0;
-
-    // Parse statements until we hit the closing brace
-    while (parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
-        Token prev_token = parser->current_token;  // Save current position
-        ASTNode* stmt = parse_statement(parser);
-        if (stmt) {
-            if (node->data.compound_statement.statement_count >= MAX_STATEMENTS) {
-                report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "too many statements in block", "reduce number of statements");
-                return NULL;
-            }
-            node->data.compound_statement.statements[node->data.compound_statement.statement_count++] = stmt;
-        } else {
-            // Error in parsing statement, synchronize and continue
-            synchronize(parser);
-            // If we haven't advanced, force advance to avoid infinite loop
-            if (parser->current_token.start == prev_token.start) {
-                advance_token(parser);
-            }
-        }
-    }
-
-    if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
-        return NULL;
-    }
-
-    return node;
+  return node;
 }
 
 static ASTNode* parse_statement(Parser* parser) {
   if (parser->current_token.type == TOKEN_INT) {
-        return parse_declaration(parser);
+    return parse_declaration(parser);
   }
 
   if (parser->current_token.type == TOKEN_IF) {
-  return parse_if_statement(parser);
+    return parse_if_statement(parser);
   }
 
   if (parser->current_token.type == TOKEN_WHILE) {
-  return parse_while_statement(parser);
+    return parse_while_statement(parser);
   }
 
   if (parser->current_token.type == TOKEN_BREAK) {
     return parse_break_statement(parser);
   }
 
-   if (parser->current_token.type == TOKEN_OPEN_BRACE) {
-        return parse_compound_statement(parser);
-   }
+  if (parser->current_token.type == TOKEN_CONTINUE) {
+    return parse_continue_statement(parser);
+  }
+
+  if (parser->current_token.type == TOKEN_OPEN_BRACE) {
+    return parse_compound_statement(parser);
+  }
 
   if (match_token(parser, TOKEN_RETURN)) {
     ASTNode* node = create_ast_node(parser, AST_RETURN_STATEMENT);
@@ -574,24 +603,23 @@ static ASTNode* parse_statement(Parser* parser) {
 
     return node;
   }
-  
-    if (parser->current_token.type == TOKEN_IDENTIFIER && 
-        parser->current_token.length == 7 && 
-        str_ncmp(parser->current_token.start, "return0", 7) == 0) {
-        report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "unexpected identifier", "did you mean 'return 0'?");
-        synchronize(parser);
-        return NULL;
-    }
-   // Fallback to expression statement (for assignments)
-    ASTNode* expr = parse_expression(parser);
-    if (!expr) return NULL;
 
-    if (!match_token(parser, TOKEN_SEMICOLON)) {
-        report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after expression", "add a semicolon");
-        return NULL;
-    }
+  if (parser->current_token.type == TOKEN_IDENTIFIER && parser->current_token.length == 7 &&
+      str_ncmp(parser->current_token.start, "return0", 7) == 0) {
+    report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "unexpected identifier", "did you mean 'return 0'?");
+    synchronize(parser);
+    return NULL;
+  }
+  // Fallback to expression statement (for assignments)
+  ASTNode* expr = parse_expression(parser);
+  if (!expr) return NULL;
 
-    return expr;
+  if (!match_token(parser, TOKEN_SEMICOLON)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after expression", "add a semicolon");
+    return NULL;
+  }
+
+  return expr;
 }
 
 static ASTNode* parse_function(Parser* parser) {
@@ -639,22 +667,22 @@ static ASTNode* parse_function(Parser* parser) {
   }
 
   // Parse statements
-    node->data.function.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
-    node->data.function.statement_count = 0;
-    while (parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
-        Token prev_token = parser->current_token;  // Save current position
-        ASTNode* stmt = parse_statement(parser);
-        if (stmt) {
-            node->data.function.statements[node->data.function.statement_count++] = stmt;
-        } else {
-            // Error in parsing statement, synchronize and continue
-            synchronize(parser);
-            // If we haven't advanced, force advance to avoid infinite loop
-            if (parser->current_token.start == prev_token.start) {
-                advance_token(parser);
-            }
-        }
+  node->data.function.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
+  node->data.function.statement_count = 0;
+  while (parser->current_token.type != TOKEN_CLOSE_BRACE && parser->current_token.type != TOKEN_EOF) {
+    Token prev_token = parser->current_token;  // Save current position
+    ASTNode* stmt = parse_statement(parser);
+    if (stmt) {
+      node->data.function.statements[node->data.function.statement_count++] = stmt;
+    } else {
+      // Error in parsing statement, synchronize and continue
+      synchronize(parser);
+      // If we haven't advanced, force advance to avoid infinite loop
+      if (parser->current_token.start == prev_token.start) {
+        advance_token(parser);
+      }
     }
+  }
 
   if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
     report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
@@ -769,69 +797,69 @@ static void ast_print_node(ASTNode* node, int depth) {
       break;
 
     case AST_VARIABLE_DECL:
-            printf("Variable Declaration: %s\n", node->data.variable_decl.name);
-            if (node->data.variable_decl.initializer) {
-                ast_print_node(node->data.variable_decl.initializer, depth + 1);
-            }
-            break;
+      printf("Variable Declaration: %s\n", node->data.variable_decl.name);
+      if (node->data.variable_decl.initializer) {
+        ast_print_node(node->data.variable_decl.initializer, depth + 1);
+      }
+      break;
 
     case AST_VARIABLE_REF:
-        printf("Variable Reference: %s\n", node->data.variable_ref.name);
-        break;
+      printf("Variable Reference: %s\n", node->data.variable_ref.name);
+      break;
 
     case AST_ASSIGNMENT:
-        printf("Assignment: %s\n", node->data.assignment.name);
-        ast_print_node(node->data.assignment.value, depth + 1);
-        break;
+      printf("Assignment: %s\n", node->data.assignment.name);
+      ast_print_node(node->data.assignment.value, depth + 1);
+      break;
 
     case AST_IF_STATEMENT:
-        printf("If Statement\n");
+      printf("If Statement\n");
+      ast_print_indent(depth + 1);
+      printf("Condition:\n");
+      ast_print_node(node->data.if_statement.condition, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("Then:\n");
+      ast_print_node(node->data.if_statement.then_statement, depth + 2);
+      if (node->data.if_statement.else_statement) {
         ast_print_indent(depth + 1);
-        printf("Condition:\n");
-        ast_print_node(node->data.if_statement.condition, depth + 2);
-        ast_print_indent(depth + 1);
-        printf("Then:\n");
-        ast_print_node(node->data.if_statement.then_statement, depth + 2);
-        if (node->data.if_statement.else_statement) {
-            ast_print_indent(depth + 1);
-            printf("Else:\n");
-            ast_print_node(node->data.if_statement.else_statement, depth + 2);
-        }
-        break;
+        printf("Else:\n");
+        ast_print_node(node->data.if_statement.else_statement, depth + 2);
+      }
+      break;
 
     case AST_TERNARY_EXPRESSION:
-        printf("Ternary Expression\n");
-        ast_print_indent(depth + 1);
-        printf("Condition:\n");
-        ast_print_node(node->data.ternary_expression.condition, depth + 2);
-        ast_print_indent(depth + 1);
-        printf("True:\n");
-        ast_print_node(node->data.ternary_expression.true_expression, depth + 2);
-        ast_print_indent(depth + 1);
-        printf("False:\n");
-        ast_print_node(node->data.ternary_expression.false_expression, depth + 2);
-        break;
+      printf("Ternary Expression\n");
+      ast_print_indent(depth + 1);
+      printf("Condition:\n");
+      ast_print_node(node->data.ternary_expression.condition, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("True:\n");
+      ast_print_node(node->data.ternary_expression.true_expression, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("False:\n");
+      ast_print_node(node->data.ternary_expression.false_expression, depth + 2);
+      break;
 
     case AST_WHILE_STATEMENT:
-        printf("While Statement\n");
-        ast_print_indent(depth + 1);
-        printf("Condition:\n");
-        ast_print_node(node->data.while_statement.condition, depth + 2);
-        ast_print_indent(depth + 1);
-        printf("Body:\n");
-        ast_print_node(node->data.while_statement.body, depth + 2);
-        break;
+      printf("While Statement\n");
+      ast_print_indent(depth + 1);
+      printf("Condition:\n");
+      ast_print_node(node->data.while_statement.condition, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("Body:\n");
+      ast_print_node(node->data.while_statement.body, depth + 2);
+      break;
 
     case AST_BREAK_STATEMENT:
-        printf("Break Statement\n");
-        break;
+      printf("Break Statement\n");
+      break;
 
     case AST_COMPOUND_STATEMENT:
-        printf("Compound Statement\n");
-        for (int i = 0; i < node->data.compound_statement.statement_count; i++) {
-            ast_print_node(node->data.compound_statement.statements[i], depth + 1);
-        }
-        break;
+      printf("Compound Statement\n");
+      for (int i = 0; i < node->data.compound_statement.statement_count; i++) {
+        ast_print_node(node->data.compound_statement.statements[i], depth + 1);
+      }
+      break;
 
     default:
       printf("Unknown node type\n");

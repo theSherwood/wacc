@@ -490,6 +490,20 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
       break;
     }
 
+    case AST_CONTINUE_STATEMENT: {
+      // Create a block region for the break statement to maintain order
+      Region* break_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
+      region_add_child(ctx->arena, ctx->current_region, break_region);
+
+      Region* old_region = ctx->current_region;
+      ctx->current_region = break_region;
+
+      emit_instruction(ctx, IR_CONTINUE, create_i32_type(), NULL, 0);
+
+      ctx->current_region = old_region;
+      break;
+    }
+
     case AST_COMPOUND_STATEMENT: {
       // Create a new scope for the compound statement
       SymbolTable* previous_scope = ctx->current_scope;
@@ -522,27 +536,6 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     default:
       break;
   }
-}
-
-// Helper function to check if a region contains a return statement
-static bool region_has_return(Region* region) {
-  if (!region) return false;
-
-  // Check instructions in this region
-  for (size_t i = 0; i < region->instruction_count; i++) {
-    if (region->instructions[i].opcode == IR_RETURN) {
-      return true;
-    }
-  }
-
-  // Check child regions recursively
-  for (size_t i = 0; i < region->child_count; i++) {
-    if (region_has_return(region->children[i])) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 // Main IR generation function
