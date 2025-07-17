@@ -23,18 +23,35 @@ run_test() {
     if [ $exit_code -eq 0 ]; then
         echo "$test_name: FAIL - should have failed to compile" > "$tmp_subdir/result.txt"
     else
-        # Parse expected error information from comments
-        expected_line=$(grep "^// ERROR:" "$test_file" | head -1)
-        if [ -n "$expected_line" ]; then
-            # Extract line number and error ID from comment
-            line_num=$(echo "$expected_line" | sed 's/.*Line \([0-9]*\).*/\1/')
-            error_id=$(echo "$expected_line" | sed 's/.*Error \([0-9]*\).*/\1/')
-
-            # Check if compiler output contains expected error
-            if echo "$output" | grep -q "$error_id" && echo "$output" | grep -q ":$line_num:"; then
+        # Parse all expected error information from comments
+        expected_errors=$(grep "^// ERROR:" "$test_file")
+        if [ -n "$expected_errors" ]; then
+            # Extract all line numbers and error IDs from comments
+            expected_count=$(echo "$expected_errors" | wc -l)
+            all_matched=true
+            missing_errors=""
+            
+            while IFS= read -r expected_line; do
+                line_num=$(echo "$expected_line" | sed 's/.*Line \([0-9]*\).*/\1/')
+                error_id=$(echo "$expected_line" | sed 's/.*Error \([0-9]*\).*/\1/')
+                
+                # Check if compiler output contains this specific error
+                if ! (echo "$output" | grep -q "$error_id" && echo "$output" | grep -q ":$line_num:"); then
+                    all_matched=false
+                    missing_errors="$missing_errors error $error_id at line $line_num;"
+                fi
+            done <<< "$expected_errors"
+            
+            # Count actual errors reported by compiler
+            actual_count=$(echo "$output" | grep -c "error:")
+            
+            if [ "$all_matched" = true ] && [ "$actual_count" -eq "$expected_count" ]; then
                 echo "$test_name: PASS" > "$tmp_subdir/result.txt"
             else
-                echo "$test_name: FAIL - expected error $error_id at line $line_num" > "$tmp_subdir/result.txt"
+                echo "$test_name: FAIL - expected $expected_count errors, got $actual_count" > "$tmp_subdir/result.txt"
+                if [ "$all_matched" = false ]; then
+                    echo "  Missing:$missing_errors" >> "$tmp_subdir/result.txt"
+                fi
                 echo "  Got: $output" >> "$tmp_subdir/result.txt"
             fi
         else
