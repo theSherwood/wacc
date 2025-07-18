@@ -89,12 +89,12 @@ FAILED=0
 for result_file in "$TMP_DIR"/*/result.txt; do
     result=$(cat "$result_file")
     echo "$result"
-    if [[ $result == *PASS ]]; then
-        PASSED=$((PASSED + 1))
-    elif [[ $result == *FAIL* ]]; then
+    if [[ $result == *FAIL* ]]; then
         FAILED=$((FAILED + 1))
     fi
 done
+
+PASSED=$((TOTAL - FAILED))
 
 echo ""
 echo "Invalid tests summary: $PASSED passed, $FAILED failed, $TOTAL total"

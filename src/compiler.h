@@ -299,6 +299,8 @@ typedef struct Type {
   } details;
 } Type;
 
+typedef struct Region Region;
+
 // IR Opcodes - Stack-based WASM-oriented instructions
 typedef enum {
   // Arithmetic
@@ -367,6 +369,11 @@ typedef enum {
   IR_POP,
   IR_DUP,
 
+  // Region
+  // This lets us define regions of code that can be ordered between and
+  // among other instructions
+  IR_REGION,
+
   // WASM-specific
   IR_UNREACHABLE,
   IR_NOP,
@@ -375,6 +382,7 @@ typedef enum {
 
 // Operand types
 typedef enum {
+  OPERAND_REGION,    // Region value
   OPERAND_CONSTANT,  // Immediate value
   OPERAND_LOCAL,     // Local variable
   OPERAND_GLOBAL,    // Global variable
@@ -396,8 +404,10 @@ typedef struct {
     int global_index;
     int memory_offset;
     int label_id;
+    Region* region;
   } value;
 } Operand;
+
 
 // Stack-based instruction
 typedef struct {
@@ -415,8 +425,9 @@ typedef enum {
   REGION_FUNCTION  // Function body
 } RegionType;
 
-typedef struct Region {
+struct Region {
   RegionType type;
+  TypeKind kind;
   int id;
   bool is_expression;  // True if this is an expression context (e.g., ternary)
   Instruction* instructions;
@@ -425,7 +436,8 @@ typedef struct Region {
   struct Region** children;  // Nested regions
   size_t child_count;
   size_t child_capacity;
-  struct Region* parent;  // Parent region
+  struct Region* parent;    // Parent region
+  struct Region* function;  // Function region
 
   // For control flow
   union {
@@ -436,8 +448,11 @@ typedef struct Region {
     struct {
       struct Region* body;
     } loop_data;
+    struct {
+      struct Region* locals;
+    } function_data;
   } data;
-} Region;
+};
 
 // Local variable
 typedef struct {

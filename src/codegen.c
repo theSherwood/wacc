@@ -188,8 +188,15 @@ typedef struct CodegenContext {
   int if_depth;  // Current nesting depth within if statements
 } CodegenContext;
 
+
+static void emit_region(Buffer* buf, Arena* arena, Region* region, CodegenContext* ctx);
+
 static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst, CodegenContext* ctx) {
   switch (inst->opcode) {
+    case IR_REGION: {
+      emit_region(buf, arena, inst->operands[0].value.region, ctx);
+      break;
+    }
     case IR_CONST_INT: {
       buffer_write_byte(buf, arena, WASM_I32_CONST);
       buffer_write_leb128_i32(buf, arena, inst->operands[0].value.constant.int_value);
@@ -411,30 +418,26 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region, CodegenContex
 
     // End block
     buffer_write_byte(buf, arena, WASM_END);
+  } else if (region->type == REGION_FUNCTION) {
+    // Emit child regions first (control flow statements)
+    for (size_t i = 0; i < region->child_count; i++) {
+      CodegenContext new_ctx = {0};  // Initialize if_depth to 0
+      emit_region(buf, arena, region->children[i], &new_ctx);
+    }
+
+    // Then emit function-level instructions
+    for (size_t i = 0; i < region->instruction_count; i++) {
+      emit_instruction(buf, arena, &region->instructions[i], ctx);
+    }
   } else {
-    // For FUNCTION regions, emit child regions first (statements processed first)
-    // For other region types, emit instructions first, then child regions
-    if (region->type == REGION_FUNCTION) {
-      // Emit child regions first (control flow statements)
-      for (size_t i = 0; i < region->child_count; i++) {
-        CodegenContext new_ctx = {0};  // Initialize if_depth to 0
-        emit_region(buf, arena, region->children[i], &new_ctx);
-      }
+    // Emit child regions
+    for (size_t i = 0; i < region->child_count; i++) {
+      emit_region(buf, arena, region->children[i], ctx);
+    }
 
-      // Then emit function-level instructions
-      for (size_t i = 0; i < region->instruction_count; i++) {
-        emit_instruction(buf, arena, &region->instructions[i], ctx);
-      }
-    } else {
-      // For other region types, emit instructions normally
-      for (size_t i = 0; i < region->instruction_count; i++) {
-        emit_instruction(buf, arena, &region->instructions[i], ctx);
-      }
-
-      // Emit child regions
-      for (size_t i = 0; i < region->child_count; i++) {
-        emit_region(buf, arena, region->children[i], ctx);
-      }
+    // For other region types, emit instructions normally
+    for (size_t i = 0; i < region->instruction_count; i++) {
+      emit_instruction(buf, arena, &region->instructions[i], ctx);
     }
   }
 }

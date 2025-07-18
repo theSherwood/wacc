@@ -96,6 +96,11 @@ static Region* region_create(Arena* arena, RegionType type, int id, Region* pare
   region->child_count = 0;
   region->child_capacity = 0;
   region->parent = parent;
+  if (type == REGION_FUNCTION) {
+    region->function = region;
+  } else if (parent) {
+    region->function = parent->function;
+  }
   return region;
 }
 
@@ -112,20 +117,6 @@ static void region_add_instruction(Arena* arena, Region* region, Instruction ins
   region->instructions[region->instruction_count++] = inst;
 }
 
-static void region_add_child(Arena* arena, Region* parent, Region* child) {
-  if (parent->child_count >= parent->child_capacity) {
-    parent->child_capacity = parent->child_capacity ? parent->child_capacity * 2 : 4;
-    Region** new_children = arena_alloc(arena, parent->child_capacity * sizeof(Region*));
-    if (parent->children) {
-      mem_cpy(new_children, parent->children, parent->child_count * sizeof(Region*));
-    }
-    parent->children = new_children;
-  }
-
-  parent->children[parent->child_count++] = child;
-  child->parent = parent;
-}
-
 // Stack-based instruction emission
 static void emit_instruction(IRContext* ctx, IROpcode opcode, Type result_type, Operand* operands, int operand_count) {
   Instruction inst = {0};
@@ -138,6 +129,15 @@ static void emit_instruction(IRContext* ctx, IROpcode opcode, Type result_type, 
   }
 
   region_add_instruction(ctx->arena, ctx->current_region, inst);
+}
+
+static void emit_region_instruction(IRContext* ctx, Region* region, Type (*func_ptr)()) {
+  Operand operand = {0};
+  operand.type = OPERAND_REGION;
+  operand.value_type = func_ptr();
+  operand.value.region = region;
+
+  emit_instruction(ctx, IR_REGION, func_ptr(), &operand, 1);
 }
 
 // Expression generation - generates stack-based operations
@@ -283,7 +283,6 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
       // Create IF region for ternary
       Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
       if_region->is_expression = true;  // Mark as expression context
-      region_add_child(ctx->arena, ctx->current_region, if_region);
 
       // Generate condition expression in the if region (pushes value to stack)
       ctx->current_region = if_region;
@@ -293,7 +292,6 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
       // Generate true branch
       Region* then_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
       if_region->data.if_data.then_region = then_region;
-      region_add_child(ctx->arena, if_region, then_region);
 
       Region* old_region = ctx->current_region;
       ctx->current_region = then_region;
@@ -303,11 +301,12 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
       // Generate false branch
       Region* else_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
       if_region->data.if_data.else_region = else_region;
-      region_add_child(ctx->arena, if_region, else_region);
 
       ctx->current_region = else_region;
       ir_generate_expression(ctx, expr->data.ternary_expression.false_expression);
       ctx->current_region = old_region;
+
+      emit_region_instruction(ctx, if_region, create_i32_type);
 
       break;
     }
@@ -332,13 +331,7 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     case AST_VARIABLE_DECL: {
       // Only create a block region for variable declarations if we're not already in a block
       Region* old_region = ctx->current_region;
-      bool create_region = (ctx->current_region->type != REGION_BLOCK);
-
-      if (create_region) {
-        Region* decl_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-        region_add_child(ctx->arena, ctx->current_region, decl_region);
-        ctx->current_region = decl_region;
-      }
+      ctx->current_region = ctx->current_region->function->data.function_data.locals;
 
       Type var_type = create_i32_type();  // Assuming all vars are i32 for now
 
@@ -377,78 +370,61 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
         emit_instruction(ctx, IR_STORE_LOCAL, var_type, &operand, 1);
       }
 
-      if (create_region) {
-        ctx->current_region = old_region;
-      }
+      ctx->current_region = old_region;
+
       break;
     }
 
     case AST_ASSIGNMENT: {
-      // Create a block region for the assignment to maintain order
-      Region* assign_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, assign_region);
-
-      Region* old_region = ctx->current_region;
-      ctx->current_region = assign_region;
-
       // Generate the assignment expression
       ir_generate_expression(ctx, stmt);
 
       // Pop the result (we don't need it for statement context)
       emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
 
-      ctx->current_region = old_region;
       break;
     }
 
     case AST_BINARY_OP: {
-      // Create a block region for the expression statement to maintain order
-      Region* expr_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, expr_region);
-
-      Region* old_region = ctx->current_region;
-      ctx->current_region = expr_region;
-
       // Generate the binary operation expression
       ir_generate_expression(ctx, stmt);
 
       // Pop the result (we don't need it for statement context)
       emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
 
-      ctx->current_region = old_region;
       break;
     }
 
     case AST_IF_STATEMENT: {
       // Create IF region
       Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, if_region);
+      Region* old_region = ctx->current_region;
+      ctx->current_region = if_region;
 
       // Generate condition expression in the if region (pushes value to stack)
-      ctx->current_region = if_region;
       ir_generate_expression(ctx, stmt->data.if_statement.condition);
-      ctx->current_region = if_region->parent;
 
       // Generate then branch
       Region* then_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
       if_region->data.if_data.then_region = then_region;
-      region_add_child(ctx->arena, if_region, then_region);
+      // emit_region_instruction(ctx, then_region, create_void_type);
 
-      Region* old_region = ctx->current_region;
       ctx->current_region = then_region;
       ir_generate_statement(ctx, stmt->data.if_statement.then_statement);
-      ctx->current_region = old_region;
 
       // Generate else branch if present
       if (stmt->data.if_statement.else_statement) {
+        ctx->current_region = if_region;
         Region* else_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
         if_region->data.if_data.else_region = else_region;
-        region_add_child(ctx->arena, if_region, else_region);
+        // emit_region_instruction(ctx, else_region, create_void_type);
 
         ctx->current_region = else_region;
         ir_generate_statement(ctx, stmt->data.if_statement.else_statement);
-        ctx->current_region = old_region;
       }
+
+      ctx->current_region = old_region;
+      emit_region_instruction(ctx, if_region, create_void_type);
 
       break;
     }
@@ -456,12 +432,10 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     case AST_DO_STATEMENT: {
       // Create LOOP region for the while statement
       Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, loop_region);
 
       // Create body region
       Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
       loop_region->data.loop_data.body = body_region;
-      region_add_child(ctx->arena, loop_region, body_region);
 
       Region* old_region = ctx->current_region;
       ctx->current_region = body_region;
@@ -479,51 +453,34 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     case AST_WHILE_STATEMENT: {
       // Create LOOP region for the while statement
       Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, loop_region);
+      Region* old_region = ctx->current_region;
 
       // Generate condition expression and body in the loop region
       ctx->current_region = loop_region;
       ir_generate_expression(ctx, stmt->data.while_statement.condition);
-      ctx->current_region = loop_region->parent;
+      ctx->current_region = old_region;
 
       // Create body region
       Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
       loop_region->data.loop_data.body = body_region;
-      region_add_child(ctx->arena, loop_region, body_region);
 
-      Region* old_region = ctx->current_region;
+      // Region* old_region = ctx->current_region;
       ctx->current_region = body_region;
       ir_generate_statement(ctx, stmt->data.while_statement.body);
       ctx->current_region = old_region;
+
+      emit_region_instruction(ctx, loop_region, create_void_type);
 
       break;
     }
 
     case AST_BREAK_STATEMENT: {
-      // Create a block region for the break statement to maintain order
-      Region* break_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, break_region);
-
-      Region* old_region = ctx->current_region;
-      ctx->current_region = break_region;
-
       emit_instruction(ctx, IR_BREAK, create_i32_type(), NULL, 0);
-
-      ctx->current_region = old_region;
       break;
     }
 
     case AST_CONTINUE_STATEMENT: {
-      // Create a block region for the break statement to maintain order
-      Region* break_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, break_region);
-
-      Region* old_region = ctx->current_region;
-      ctx->current_region = break_region;
-
       emit_instruction(ctx, IR_CONTINUE, create_i32_type(), NULL, 0);
-
-      ctx->current_region = old_region;
       break;
     }
 
@@ -537,20 +494,12 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
         return;
       }
 
-      // Create a BLOCK region for the compound statement
-      Region* block_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, ctx->current_region);
-      region_add_child(ctx->arena, ctx->current_region, block_region);
-
-      Region* old_region = ctx->current_region;
-      ctx->current_region = block_region;
-
       // Generate IR for all statements in the compound statement
       for (int i = 0; i < stmt->data.compound_statement.statement_count; i++) {
         ir_generate_statement(ctx, stmt->data.compound_statement.statements[i]);
       }
 
-      // Restore previous region and scope
-      ctx->current_region = old_region;
+      // Restore previous scope
       ctx->current_scope = previous_scope;
 
       break;
@@ -603,6 +552,12 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
   ctx.current_function = func;
   ctx.current_region = func->body;
   ctx.current_scope = symbol_table_create(arena, NULL);
+
+  // Create function locals region
+  Region* locals_region = region_create(arena, REGION_BLOCK, ctx.next_region_id++, NULL);
+  func->body->data.function_data.locals = locals_region;
+
+  emit_region_instruction(&ctx, locals_region, create_void_type);
 
   // Generate IR for all statements
   for (int i = 0; i < function_node->data.function.statement_count; i++) {
@@ -671,13 +626,20 @@ static const char* ir_opcode_to_string(IROpcode opcode) {
       return "else";
     case IR_END:
       return "end";
+    case IR_REGION:
+      return "";
     default:
       return "unknown";
   }
 }
 
-static void ir_print_operand(Operand* operand) {
+static void ir_print_region(Region* region, int indent);
+
+static void ir_print_operand(Operand* operand, int indent) {
   switch (operand->type) {
+    case OPERAND_REGION:
+      ir_print_region(operand->value.region, indent);
+      break;
     case OPERAND_CONSTANT:
       printf("%d", operand->value.constant.int_value);
       break;
@@ -696,51 +658,62 @@ static void ir_print_operand(Operand* operand) {
   }
 }
 
-static void ir_print_instruction(Instruction* inst, int indent) {
+static void print_indent(int indent) {
   for (int i = 0; i < indent; i++) {
     printf("  ");
   }
+}
+
+static void ir_print_instruction(Instruction* inst, int indent) {
+  print_indent(indent);
 
   printf("%s", ir_opcode_to_string(inst->opcode));
 
   for (int i = 0; i < inst->operand_count; i++) {
-    printf(" ");
-    ir_print_operand(&inst->operands[i]);
+    if (inst->opcode != IR_REGION) printf(" ");
+    ir_print_operand(&inst->operands[i], indent);
   }
 
-  printf("\n");
+  if (inst->opcode != IR_REGION) printf("\n");
+}
+
+static void ir_print_instructions(Region* region, int indent) {
+  for (size_t i = 0; i < region->instruction_count; i++) {
+    ir_print_instruction(&region->instructions[i], indent + 1);
+  }
 }
 
 static void ir_print_region(Region* region, int indent) {
   if (!region) return;
 
-  for (int i = 0; i < indent; i++) {
-    printf("  ");
-  }
-
   switch (region->type) {
     case REGION_FUNCTION:
-      printf("function:\n");
-      break;
+      ir_print_instructions(region, indent - 1);
+      return;
     case REGION_BLOCK:
       printf("block:\n");
+      ir_print_instructions(region, indent);
       break;
     case REGION_LOOP:
       printf("loop:\n");
+      ir_print_instructions(region, indent);
+      print_indent(indent + 1);
+      ir_print_region(region->data.loop_data.body, indent + 1);
       break;
-    case REGION_IF:
-      printf("if:\n");
+    case REGION_IF: {
+      if (region->is_expression)
+        printf("if (expr):\n");
+      else
+        printf("if:\n");
+      ir_print_instructions(region, indent);
+      print_indent(indent + 1);
+      ir_print_region(region->data.if_data.then_region, indent + 1);
+      if (region->data.if_data.else_region) {
+        print_indent(indent + 1);
+        ir_print_region(region->data.if_data.else_region, indent + 1);
+      }
       break;
-  }
-
-  // Print instructions
-  for (size_t i = 0; i < region->instruction_count; i++) {
-    ir_print_instruction(&region->instructions[i], indent + 1);
-  }
-
-  // Print children
-  for (size_t i = 0; i < region->child_count; i++) {
-    ir_print_region(region->children[i], indent + 1);
+    }
   }
 }
 
@@ -766,7 +739,8 @@ void ir_print(IRModule* ir_module) {
     printf(" {\n");
 
     // Print locals
-    printf("  locals: ");
+    print_indent(1);
+    printf("locals: ");
     for (size_t j = 0; j < func->local_count; j++) {
       if (j > 0) printf(", ");
       printf("$%d:%s", func->locals[j].index, func->locals[j].name);
