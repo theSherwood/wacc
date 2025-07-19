@@ -329,10 +329,6 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     }
 
     case AST_VARIABLE_DECL: {
-      // Only create a block region for variable declarations if we're not already in a block
-      Region* old_region = ctx->current_region;
-      ctx->current_region = ctx->current_region->function->data.function_data.locals;
-
       Type var_type = create_i32_type();  // Assuming all vars are i32 for now
 
       // Add variable to function locals
@@ -369,8 +365,6 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
 
         emit_instruction(ctx, IR_STORE_LOCAL, var_type, &operand, 1);
       }
-
-      ctx->current_region = old_region;
 
       break;
     }
@@ -552,12 +546,6 @@ IRModule* ir_generate(Arena* arena, ASTNode* ast) {
   ctx.current_function = func;
   ctx.current_region = func->body;
   ctx.current_scope = symbol_table_create(arena, NULL);
-
-  // Create function locals region
-  Region* locals_region = region_create(arena, REGION_BLOCK, ctx.next_region_id++, NULL);
-  func->body->data.function_data.locals = locals_region;
-
-  emit_region_instruction(&ctx, locals_region, create_void_type);
 
   // Generate IR for all statements
   for (int i = 0; i < function_node->data.function.statement_count; i++) {

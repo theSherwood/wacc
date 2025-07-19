@@ -448,9 +448,6 @@ struct Region {
     struct {
       struct Region* body;
     } loop_data;
-    struct {
-      struct Region* locals;
-    } function_data;
   } data;
 };
 
