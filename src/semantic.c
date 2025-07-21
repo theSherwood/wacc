@@ -236,28 +236,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       return success;
     }
 
-    case AST_DO_STATEMENT: {
-      bool success = true;
-
-      // Analyze the condition
-      if (!analyze_expression(ctx, stmt->data.do_while_statement.condition)) {
-        success = false;
-      }
-
-      // Set loop context and analyze the body
-      bool previous_in_loop = ctx->in_loop;
-      ctx->in_loop = true;
-
-      if (!analyze_statement(ctx, stmt->data.do_while_statement.body)) {
-        success = false;
-      }
-
-      // Restore previous loop context
-      ctx->in_loop = previous_in_loop;
-
-      return success;
-    }
-
+    case AST_DO_WHILE_STATEMENT:
     case AST_WHILE_STATEMENT: {
       bool success = true;
 

@@ -422,45 +422,25 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
       break;
     }
 
-    case AST_DO_STATEMENT: {
-      // Create LOOP region for the while statement
-      Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
-
-      // Create body region
-      Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
-      loop_region->data.loop_data.body = body_region;
-
-      Region* old_region = ctx->current_region;
-      ctx->current_region = body_region;
-      ir_generate_statement(ctx, stmt->data.do_while_statement.body);
-      ctx->current_region = old_region;
-
-      // Generate condition expression and body in the loop region
-      ctx->current_region = loop_region;
-      ir_generate_expression(ctx, stmt->data.do_while_statement.condition);
-      ctx->current_region = loop_region->parent;
-
-      break;
-    }
-
+    case AST_DO_WHILE_STATEMENT:
     case AST_WHILE_STATEMENT: {
       // Create LOOP region for the while statement
       Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
-      Region* old_region = ctx->current_region;
+      if (stmt->type == AST_DO_WHILE_STATEMENT) loop_region->data.loop_data.is_do_while = true;
 
       // Generate condition expression and body in the loop region
-      ctx->current_region = loop_region;
+      Region* condition_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
+      loop_region->data.loop_data.condition = condition_region;
+      ctx->current_region = condition_region;
       ir_generate_expression(ctx, stmt->data.while_statement.condition);
-      ctx->current_region = old_region;
 
       // Create body region
       Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
       loop_region->data.loop_data.body = body_region;
-
-      // Region* old_region = ctx->current_region;
       ctx->current_region = body_region;
       ir_generate_statement(ctx, stmt->data.while_statement.body);
-      ctx->current_region = old_region;
+
+      ctx->current_region = loop_region->parent;
 
       emit_region_instruction(ctx, loop_region, create_void_type);
 
@@ -683,12 +663,22 @@ static void ir_print_region(Region* region, int indent) {
       printf("block:\n");
       ir_print_instructions(region, indent);
       break;
-    case REGION_LOOP:
-      printf("loop:\n");
-      ir_print_instructions(region, indent);
-      print_indent(indent + 1);
-      ir_print_region(region->data.loop_data.body, indent + 1);
+    case REGION_LOOP: {
+      if (region->data.loop_data.is_do_while) {
+        printf("loop (do-while):\n");
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.body, indent + 1);
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.condition, indent + 1);
+      } else {
+        printf("loop:\n");
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.condition, indent + 1);
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.body, indent + 1);
+      }
       break;
+    }
     case REGION_IF: {
       if (region->is_expression)
         printf("if (expr):\n");

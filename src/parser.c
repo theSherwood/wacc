@@ -480,11 +480,11 @@ static ASTNode* parse_do_while_statement(Parser* parser) {
     return NULL;
   }
 
-  ASTNode* node = create_ast_node(parser, AST_DO_STATEMENT);
+  ASTNode* node = create_ast_node(parser, AST_DO_WHILE_STATEMENT);
   if (!node) return NULL;
 
-  node->data.do_while_statement.body = body;
-  node->data.do_while_statement.condition = condition;
+  node->data.while_statement.body = body;
+  node->data.while_statement.condition = condition;
 
   return node;
 }
@@ -912,6 +912,16 @@ static void ast_print_node(ASTNode* node, int depth) {
       ast_print_indent(depth + 1);
       printf("False:\n");
       ast_print_node(node->data.ternary_expression.false_expression, depth + 2);
+      break;
+
+    case AST_DO_WHILE_STATEMENT:
+      printf("Do While Statement\n");
+      ast_print_indent(depth + 1);
+      printf("Body:\n");
+      ast_print_node(node->data.while_statement.body, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("Condition:\n");
+      ast_print_node(node->data.while_statement.condition, depth + 2);
       break;
 
     case AST_WHILE_STATEMENT:

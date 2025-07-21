@@ -161,7 +161,7 @@ typedef enum {
   AST_VARIABLE_REF,
   AST_ASSIGNMENT,
   AST_IF_STATEMENT,
-  AST_DO_STATEMENT,
+  AST_DO_WHILE_STATEMENT,
   AST_WHILE_STATEMENT,
   AST_BREAK_STATEMENT,
   AST_CONTINUE_STATEMENT,
@@ -213,10 +213,6 @@ typedef struct ASTNode {
       struct ASTNode* then_statement;
       struct ASTNode* else_statement;  // Can be NULL
     } if_statement;
-    struct {
-      struct ASTNode* body;
-      struct ASTNode* condition;
-    } do_while_statement;
     struct {
       struct ASTNode* condition;
       struct ASTNode* body;
@@ -408,7 +404,6 @@ typedef struct {
   } value;
 } Operand;
 
-
 // Stack-based instruction
 typedef struct {
   IROpcode opcode;
@@ -446,6 +441,8 @@ struct Region {
       struct Region* else_region;
     } if_data;
     struct {
+      bool is_do_while;  // True if this is a do-while loop
+      struct Region* condition;
       struct Region* body;
     } loop_data;
   } data;
