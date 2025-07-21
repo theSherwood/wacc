@@ -282,21 +282,20 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
     case AST_TERNARY_EXPRESSION: {
       // Create IF region for ternary
       Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
-      if_region->is_expression = true;  // Mark as expression context
+      if_region->is_expression = true;
+      Region* old_region = ctx->current_region;
+      ctx->current_region = if_region;
 
       // Generate condition expression in the if region (pushes value to stack)
-      ctx->current_region = if_region;
       ir_generate_expression(ctx, expr->data.ternary_expression.condition);
-      ctx->current_region = if_region->parent;
 
       // Generate true branch
       Region* then_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
       if_region->data.if_data.then_region = then_region;
 
-      Region* old_region = ctx->current_region;
       ctx->current_region = then_region;
       ir_generate_expression(ctx, expr->data.ternary_expression.true_expression);
-      ctx->current_region = old_region;
+      ctx->current_region = if_region;
 
       // Generate false branch
       Region* else_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, if_region);
@@ -304,9 +303,9 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
 
       ctx->current_region = else_region;
       ir_generate_expression(ctx, expr->data.ternary_expression.false_expression);
-      ctx->current_region = old_region;
 
-      emit_region_instruction(ctx, if_region, create_i32_type);
+      ctx->current_region = old_region;
+      emit_region_instruction(ctx, if_region, create_void_type);
 
       break;
     }
@@ -500,6 +499,8 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     }
 
     default:
+      ir_generate_expression(ctx, stmt);
+
       break;
   }
 }
