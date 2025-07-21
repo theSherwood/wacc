@@ -13,6 +13,7 @@ typedef struct SymbolTable {
 // Semantic analysis context
 typedef struct SemanticContext {
   Arena* arena;
+  Parser* parser;
   ErrorList* errors;
   SymbolTable* current_scope;
   bool in_loop;        // Track if we're currently inside a loop
@@ -90,10 +91,12 @@ static void report_semantic_error(SemanticContext* ctx, int error_id, const char
 }
 
 // Forward declarations
-static bool analyze_expression(SemanticContext* ctx, ASTNode* expr);
+static bool analyze_expression(SemanticContext* ctx, ASTNode** expr_node);
 static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt);
 
-static bool analyze_expression(SemanticContext* ctx, ASTNode* expr) {
+static bool analyze_expression(SemanticContext* ctx, ASTNode** expr_node) {
+  if (!expr_node) return true;
+  ASTNode* expr = *expr_node;
   if (!expr) return true;
 
   switch (expr->type) {
@@ -112,12 +115,42 @@ static bool analyze_expression(SemanticContext* ctx, ASTNode* expr) {
     }
 
     case AST_UNARY_OP: {
-      return analyze_expression(ctx, expr->data.unary_op.operand);
+      return analyze_expression(ctx, &expr->data.unary_op.operand);
     }
 
     case AST_BINARY_OP: {
-      bool left_ok = analyze_expression(ctx, expr->data.binary_op.left);
-      bool right_ok = analyze_expression(ctx, expr->data.binary_op.right);
+      bool left_ok = analyze_expression(ctx, &expr->data.binary_op.left);
+      bool right_ok = analyze_expression(ctx, &expr->data.binary_op.right);
+
+      if (expr->data.binary_op.operator == TOKEN_AMP_AMP || expr->data.binary_op.operator == TOKEN_PIPE_PIPE) {
+        // LOGICAL AND = A ? (B ? 1 : 0) : 0
+        // LOGICAL OR  = A ? 1 : (B ? 1 : 0)
+
+        ASTNode* A_node = create_ast_node(ctx->parser, AST_TERNARY_EXPRESSION);
+        A_node->data.ternary_expression.condition = expr->data.binary_op.left;
+
+        ASTNode* B_node = create_ast_node(ctx->parser, AST_TERNARY_EXPRESSION);
+        B_node->data.ternary_expression.condition = expr->data.binary_op.right;
+
+        ASTNode* one_node = create_ast_node(ctx->parser, AST_INTEGER_CONSTANT);
+        one_node->data.integer_constant.value = 1;
+        ASTNode* zero_node = create_ast_node(ctx->parser, AST_INTEGER_CONSTANT);
+        zero_node->data.integer_constant.value = 0;
+
+        B_node->data.ternary_expression.true_expression = one_node;
+        B_node->data.ternary_expression.false_expression = zero_node;
+
+        if (expr->data.binary_op.operator == TOKEN_AMP_AMP) {
+          A_node->data.ternary_expression.true_expression = B_node;
+          A_node->data.ternary_expression.false_expression = zero_node;
+        } else {
+          A_node->data.ternary_expression.true_expression = one_node;
+          A_node->data.ternary_expression.false_expression = B_node;
+        }
+
+        *expr_node = A_node;
+      }
+
       return left_ok && right_ok;
     }
 
@@ -130,7 +163,7 @@ static bool analyze_expression(SemanticContext* ctx, ASTNode* expr) {
       }
 
       // Analyze the assigned value
-      return analyze_expression(ctx, expr->data.assignment.value);
+      return analyze_expression(ctx, &expr->data.assignment.value);
     }
 
     default:
@@ -143,7 +176,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
 
   switch (stmt->type) {
     case AST_RETURN_STATEMENT: {
-      return analyze_expression(ctx, stmt->data.return_statement.expression);
+      return analyze_expression(ctx, &stmt->data.return_statement.expression);
     }
 
     case AST_VARIABLE_DECL: {
@@ -161,14 +194,14 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
 
       // Analyze initializer if present
       if (stmt->data.variable_decl.initializer) {
-        return analyze_expression(ctx, stmt->data.variable_decl.initializer);
+        return analyze_expression(ctx, &stmt->data.variable_decl.initializer);
       }
 
       return true;
     }
 
     case AST_ASSIGNMENT: {
-      return analyze_expression(ctx, stmt);
+      return analyze_expression(ctx, &stmt);
     }
 
     case AST_COMPOUND_STATEMENT: {
@@ -201,7 +234,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       bool success = true;
 
       // Analyze the condition
-      if (!analyze_expression(ctx, stmt->data.if_statement.condition)) {
+      if (!analyze_expression(ctx, &stmt->data.if_statement.condition)) {
         success = false;
       }
 
@@ -241,7 +274,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       bool success = true;
 
       // Analyze the condition
-      if (!analyze_expression(ctx, stmt->data.while_statement.condition)) {
+      if (!analyze_expression(ctx, &stmt->data.while_statement.condition)) {
         success = false;
       }
 
@@ -283,12 +316,12 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
 
     default:
       // Other statement types (like expression statements)
-      return analyze_expression(ctx, stmt);
+      return analyze_expression(ctx, &stmt);
   }
 }
 
 // Main semantic analysis function
-bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors, const char* source) {
+bool semantic_analyze(Arena* arena, Parser* parser, ASTNode* ast, ErrorList* errors, const char* source) {
   if (!ast || ast->type != AST_PROGRAM) {
     return false;
   }
@@ -296,6 +329,7 @@ bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors, const char*
   // Create semantic context
   SemanticContext ctx = {0};
   ctx.arena = arena;
+  ctx.parser = parser;
   ctx.errors = errors;
   ctx.current_scope = symbol_table_create(arena, NULL);
   ctx.in_loop = false;

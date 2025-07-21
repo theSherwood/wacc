@@ -244,6 +244,8 @@ typedef struct Parser {
 Parser* parser_create(Arena* arena, Lexer* lexer, ErrorList* errors);
 ASTNode* parser_parse_program(Parser* parser);
 
+ASTNode* create_ast_node(Parser* parser, ASTNodeType type);
+
 // AST debugging
 void ast_print(ASTNode* ast);
 
@@ -431,8 +433,7 @@ struct Region {
   struct Region** children;  // Nested regions
   size_t child_count;
   size_t child_capacity;
-  struct Region* parent;    // Parent region
-  struct Region* function;  // Function region
+  struct Region* parent;  // Parent region
 
   // For control flow
   union {
@@ -484,7 +485,7 @@ typedef struct {
 } IRModule;
 
 // Semantic analysis
-bool semantic_analyze(Arena* arena, ASTNode* ast, ErrorList* errors, const char* source);
+bool semantic_analyze(Arena* arena, Parser* parser, ASTNode* ast, ErrorList* errors, const char* source);
 
 // IR generation
 IRModule* ir_generate(Arena* arena, ASTNode* ast);

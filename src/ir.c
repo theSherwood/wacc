@@ -96,11 +96,6 @@ static Region* region_create(Arena* arena, RegionType type, int id, Region* pare
   region->child_count = 0;
   region->child_capacity = 0;
   region->parent = parent;
-  if (type == REGION_FUNCTION) {
-    region->function = region;
-  } else if (parent) {
-    region->function = parent->function;
-  }
   return region;
 }
 
@@ -138,6 +133,26 @@ static void emit_region_instruction(IRContext* ctx, Region* region, Type (*func_
   operand.value.region = region;
 
   emit_instruction(ctx, IR_REGION, func_ptr(), &operand, 1);
+}
+
+static void add_function_local(IRContext* ctx, Type type, const char* name) {
+  // Add variable to function locals
+  Function* func = ctx->current_function;
+  if (func->local_count >= func->local_capacity) {
+    func->local_capacity = func->local_capacity ? func->local_capacity * 2 : 8;
+    LocalVariable* new_locals = arena_alloc(ctx->arena, func->local_capacity * sizeof(LocalVariable));
+    if (func->locals) {
+      mem_cpy(new_locals, func->locals, func->local_count * sizeof(LocalVariable));
+    }
+    func->locals = new_locals;
+  }
+
+  int local_index = func->local_count;
+  func->locals[func->local_count].name = name;
+  func->locals[func->local_count].type = type;
+  func->locals[func->local_count].index = local_index;
+  func->locals[func->local_count].is_stack_based = false;  // Use WASM local for now
+  func->local_count++;
 }
 
 // Expression generation - generates stack-based operations
@@ -191,22 +206,8 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
     }
 
     case AST_BINARY_OP: {
-      // Handle logical operations with short-circuit evaluation
-      if (expr->data.binary_op.operator == TOKEN_AMP_AMP) {
-        // Logical AND: if (left) return right; else return left;
-        // For now, fall back to regular binary operation
-        ir_generate_expression(ctx, expr->data.binary_op.left);
-        ir_generate_expression(ctx, expr->data.binary_op.right);
-        emit_instruction(ctx, IR_LOGICAL_AND, create_i32_type(), NULL, 0);
-        break;
-      } else if (expr->data.binary_op.operator == TOKEN_PIPE_PIPE) {
-        // Logical OR: if (left) return left; else return right;
-        // For now, fall back to regular binary operation
-        ir_generate_expression(ctx, expr->data.binary_op.left);
-        ir_generate_expression(ctx, expr->data.binary_op.right);
-        emit_instruction(ctx, IR_LOGICAL_OR, create_i32_type(), NULL, 0);
-        break;
-      }
+      // Logical operations with short-circuit evaluation were transformed
+      // into ternaries at an earlier stage.
 
       // Regular binary operations - generate both operands first
       ir_generate_expression(ctx, expr->data.binary_op.left);
@@ -329,24 +330,8 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
 
     case AST_VARIABLE_DECL: {
       Type var_type = create_i32_type();  // Assuming all vars are i32 for now
-
-      // Add variable to function locals
-      Function* func = ctx->current_function;
-      if (func->local_count >= func->local_capacity) {
-        func->local_capacity = func->local_capacity ? func->local_capacity * 2 : 8;
-        LocalVariable* new_locals = arena_alloc(ctx->arena, func->local_capacity * sizeof(LocalVariable));
-        if (func->locals) {
-          mem_cpy(new_locals, func->locals, func->local_count * sizeof(LocalVariable));
-        }
-        func->locals = new_locals;
-      }
-
-      int local_index = func->local_count;
-      func->locals[func->local_count].name = stmt->data.variable_decl.name;
-      func->locals[func->local_count].type = var_type;
-      func->locals[func->local_count].index = local_index;
-      func->locals[func->local_count].is_stack_based = false;  // Use WASM local for now
-      func->local_count++;
+      int local_index = ctx->current_function->local_count;
+      add_function_local(ctx, var_type, stmt->data.variable_decl.name);
 
       // Add to symbol table
       symbol_table_add(ctx->arena, ctx->current_scope, stmt->data.variable_decl.name, var_type, local_index, false);

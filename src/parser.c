@@ -55,7 +55,7 @@ static bool match_token(Parser* parser, TokenType type) {
   return false;
 }
 
-static ASTNode* create_ast_node(Parser* parser, ASTNodeType type) {
+ASTNode* create_ast_node(Parser* parser, ASTNodeType type) {
   ASTNode* node = arena_alloc(parser->arena, sizeof(ASTNode));
   if (!node) return NULL;
   node->type = type;
