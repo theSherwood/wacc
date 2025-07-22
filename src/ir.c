@@ -432,6 +432,12 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
       break;
     }
 
+    case AST_FOR_STATEMENT: {
+      //
+
+      break;
+    }
+
     case AST_BREAK_STATEMENT: {
       emit_instruction(ctx, IR_BREAK, create_i32_type(), NULL, 0);
       break;

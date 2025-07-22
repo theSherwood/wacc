@@ -493,14 +493,19 @@ static ASTNode* parse_for_statement(Parser* parser) {
   ASTNode* init_statement = parse_statement(parser);
   expect_node(init_statement, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add statement");
 
+  ASTNode* condition;
   if (!match_token(parser, TOKEN_SEMICOLON)) {
-    ASTNode* condition = parse_expression(parser);
+    condition = parse_expression(parser);
     expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add condition expression");
     expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after the condition", "add ';'");
+  } else {
+    condition = create_ast_node(parser, AST_INTEGER_CONSTANT);
+    condition->data.integer_constant.value = 1;
   }
 
+  ASTNode* increment;
   if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-    ASTNode* increment = parse_expression(parser);
+    increment = parse_expression(parser);
     expect_node(increment, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add increment expression");
     expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after for loop", "add ')'");
   }
@@ -510,6 +515,11 @@ static ASTNode* parse_for_statement(Parser* parser) {
 
   ASTNode* node = create_ast_node(parser, AST_FOR_STATEMENT);
   if (!node) return NULL;
+
+  node->data.for_statement.init_statement = init_statement;
+  node->data.for_statement.condition = condition;
+  node->data.for_statement.increment = increment;
+  node->data.for_statement.body = body;
 
   return NULL;
 }
@@ -877,6 +887,22 @@ static void ast_print_node(ASTNode* node, int depth) {
       ast_print_indent(depth + 1);
       printf("Body:\n");
       ast_print_node(node->data.while_statement.body, depth + 2);
+      break;
+
+    case AST_FOR_STATEMENT:
+      printf("For Statement\n");
+      ast_print_indent(depth + 1);
+      printf("Init Statement:\n");
+      ast_print_node(node->data.for_statement.init_statement, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("Condition:\n");
+      ast_print_node(node->data.for_statement.condition, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("Increment:\n");
+      ast_print_node(node->data.for_statement.increment, depth + 2);
+      ast_print_indent(depth + 1);
+      printf("Body:\n");
+      ast_print_node(node->data.for_statement.body, depth + 2);
       break;
 
     case AST_BREAK_STATEMENT:

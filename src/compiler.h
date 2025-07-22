@@ -220,8 +220,11 @@ typedef struct ASTNode {
       struct ASTNode* body;
     } while_statement;
     struct {
-      // Break statements have no additional data
-    } break_statement;
+      struct ASTNode* init_statement;
+      struct ASTNode* condition;
+      struct ASTNode* increment;
+      struct ASTNode* body;
+    } for_statement;
     struct {
       struct ASTNode* condition;
       struct ASTNode* true_expression;
