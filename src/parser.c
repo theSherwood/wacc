@@ -521,7 +521,7 @@ static ASTNode* parse_for_statement(Parser* parser) {
   node->data.for_statement.increment = increment;
   node->data.for_statement.body = body;
 
-  return NULL;
+  return node;
 }
 
 static ASTNode* parse_break_statement(Parser* parser) {

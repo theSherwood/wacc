@@ -433,7 +433,31 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     }
 
     case AST_FOR_STATEMENT: {
-      //
+      if (stmt->data.for_statement.init_statement) {
+        ir_generate_statement(ctx, stmt->data.for_statement.init_statement);
+      }
+
+      Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
+
+      // Generate condition expression and body in the loop region
+      Region* condition_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
+      loop_region->data.loop_data.condition = condition_region;
+      ctx->current_region = condition_region;
+      ir_generate_expression(ctx, stmt->data.for_statement.condition);
+
+      // Create body region
+      Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
+      loop_region->data.loop_data.body = body_region;
+      ctx->current_region = body_region;
+      ir_generate_statement(ctx, stmt->data.for_statement.body);
+
+      if (stmt->data.for_statement.increment) {
+        ir_generate_expression(ctx, stmt->data.for_statement.increment);
+      }
+
+      ctx->current_region = loop_region->parent;
+
+      emit_region_instruction(ctx, loop_region, create_void_type);
 
       break;
     }
