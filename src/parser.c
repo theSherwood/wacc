@@ -4,6 +4,13 @@
 
 #define MAX_STATEMENTS 256
 
+#define expect_node(node, error, message, suggestion) \
+  if (!node) {                                        \
+    report_error(parser, error, message, suggestion); \
+    synchronize(parser);                              \
+    return NULL;                                      \
+  }
+
 #define expect(token, error, message, suggestion)     \
   if (!match_token(parser, token)) {                  \
     report_error(parser, error, message, suggestion); \
@@ -480,15 +487,29 @@ static ASTNode* parse_while_statement(Parser* parser) {
 }
 
 static ASTNode* parse_for_statement(Parser* parser) {
-  if (!match_token(parser, TOKEN_FOR)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'for'", "add 'for' keyword");
-    return NULL;
+  expect_token(TOKEN_FOR, "expected 'for' keyword", "add 'for' keyword");
+  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'for'", "add '('");
+
+  ASTNode* init_statement = parse_statement(parser);
+  expect_node(init_statement, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add statement");
+
+  if (!match_token(parser, TOKEN_SEMICOLON)) {
+    ASTNode* condition = parse_expression(parser);
+    expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add condition expression");
+    expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after the condition", "add ';'");
   }
 
-  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'for'", "add '('");
-    return NULL;
+  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
+    ASTNode* increment = parse_expression(parser);
+    expect_node(increment, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add increment expression");
+    expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after for loop", "add ')'");
   }
+
+  ASTNode* body = parse_statement(parser);
+  expect_node(body, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add statement");
+
+  ASTNode* node = create_ast_node(parser, AST_FOR_STATEMENT);
+  if (!node) return NULL;
 
   return NULL;
 }
@@ -586,6 +607,10 @@ static ASTNode* parse_statement(Parser* parser) {
     return parse_while_statement(parser);
   }
 
+  if (parser->current_token.type == TOKEN_FOR) {
+    return parse_for_statement(parser);
+  }
+
   if (parser->current_token.type == TOKEN_BREAK) {
     return parse_break_statement(parser);
   }
@@ -611,13 +636,6 @@ static ASTNode* parse_statement(Parser* parser) {
     expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';'", "add a semicolon");
 
     return node;
-  }
-
-  if (parser->current_token.type == TOKEN_IDENTIFIER && parser->current_token.length == 7 &&
-      str_ncmp(parser->current_token.start, "return0", 7) == 0) {
-    report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "unexpected identifier", "did you mean 'return 0'?");
-    synchronize(parser);
-    return NULL;
   }
 
   // Check for mismatched else clause
