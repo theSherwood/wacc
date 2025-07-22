@@ -94,7 +94,10 @@ static void report_semantic_error(SemanticContext* ctx, int error_id, const char
 static bool analyze_expression(SemanticContext* ctx, ASTNode** expr_node);
 static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt);
 
-static bool analyze_expression(SemanticContext* ctx, ASTNode** expr_node) {
+static bool analyze_expression(SemanticContext* ctx,
+                               // Take the address of the pointer so that the node can be swapped out if necessary.
+                               // For example, logical AND and OR are transformed into ternary expressions.
+                               ASTNode** expr_node) {
   if (!expr_node) return true;
   ASTNode* expr = *expr_node;
   if (!expr) return true;
@@ -122,6 +125,7 @@ static bool analyze_expression(SemanticContext* ctx, ASTNode** expr_node) {
       bool left_ok = analyze_expression(ctx, &expr->data.binary_op.left);
       bool right_ok = analyze_expression(ctx, &expr->data.binary_op.right);
 
+      // Transform logical AND and OR into ternary expressions
       if (expr->data.binary_op.operator == TOKEN_AMP_AMP || expr->data.binary_op.operator == TOKEN_PIPE_PIPE) {
         // LOGICAL AND = A ? (B ? 1 : 0) : 0
         // LOGICAL OR  = A ? 1 : (B ? 1 : 0)

@@ -45,6 +45,9 @@ static TokenType get_keyword_type(const char* start, size_t length) {
   if (length == 3 && str_ncmp(start, "int", 3) == 0) {
     return TOKEN_INT;
   }
+  if (length == 3 && str_ncmp(start, "for", 3) == 0) {
+    return TOKEN_FOR;
+  }
   if (length == 6 && str_ncmp(start, "return", 6) == 0) {
     return TOKEN_RETURN;
   }

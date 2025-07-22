@@ -4,6 +4,15 @@
 
 #define MAX_STATEMENTS 256
 
+#define expect(token, error, message, suggestion)     \
+  if (!match_token(parser, token)) {                  \
+    report_error(parser, error, message, suggestion); \
+    synchronize(parser);                              \
+    return NULL;                                      \
+  }
+
+#define expect_token(token, message, suggestion) expect(token, ERROR_SYNTAX_EXPECTED_TOKEN, message, suggestion)
+
 Parser* parser_create(Arena* arena, Lexer* lexer, ErrorList* errors) {
   Parser* parser = arena_alloc(arena, sizeof(Parser));
   if (!parser) return NULL;
@@ -124,10 +133,7 @@ static ASTNode* parse_primary(Parser* parser) {
     ASTNode* expr = parse_expression(parser);
     if (!expr) return NULL;
 
-    if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-      report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
-      return NULL;
-    }
+    expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
 
     return expr;
   }
@@ -315,10 +321,7 @@ static ASTNode* parse_ternary_expression(Parser* parser) {
     ASTNode* true_expr = parse_expression(parser);
     if (!true_expr) return NULL;
 
-    if (!match_token(parser, TOKEN_COLON)) {
-      report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected ':' in ternary expression", "add ':'");
-      return NULL;
-    }
+    expect_token(TOKEN_COLON, "expected ':' in ternary expression", "add ':'");
 
     ASTNode* false_expr = parse_ternary_expression(parser);  // Right-associative
     if (!false_expr) return NULL;
@@ -365,10 +368,7 @@ static ASTNode* parse_expression(Parser* parser) {
 }
 
 static ASTNode* parse_declaration(Parser* parser) {
-  if (!match_token(parser, TOKEN_INT)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'int' type specifier", "add 'int'");
-    return NULL;
-  }
+  expect_token(TOKEN_INT, "expected 'int' type specifier", "add 'int'");
 
   if (parser->current_token.type != TOKEN_IDENTIFIER) {
     report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected identifier after type", "add a variable name");
@@ -407,23 +407,13 @@ static ASTNode* parse_declaration(Parser* parser) {
 }
 
 static ASTNode* parse_if_statement(Parser* parser) {
-  if (!match_token(parser, TOKEN_IF)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'if'", "add 'if' keyword");
-    return NULL;
-  }
+  expect_token(TOKEN_IF, "expected 'if' keyword", "add 'if' keyword");
+  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('")
 
-  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('");
-    return NULL;
-  }
-
-  ASTNode* condition = parse_expression(parser);
+      ASTNode* condition = parse_expression(parser);
   if (!condition) return NULL;
 
-  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after if condition", "add ')'");
-    return NULL;
-  }
+  expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after if condition", "add ')'");
 
   ASTNode* then_statement = parse_statement(parser);
   if (!then_statement) return NULL;
@@ -445,40 +435,19 @@ static ASTNode* parse_if_statement(Parser* parser) {
 }
 
 static ASTNode* parse_do_while_statement(Parser* parser) {
-  if (!match_token(parser, TOKEN_DO)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'do'", "add 'do' keyword");
-    return NULL;
-  }
+  expect_token(TOKEN_DO, "expected 'do' keyword", "add 'do' keyword");
 
   ASTNode* body = parse_statement(parser);
   if (!body) return NULL;
 
-  if (!match_token(parser, TOKEN_WHILE)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
-    synchronize(parser);
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
-    synchronize(parser);
-    return NULL;
-  }
+  expect_token(TOKEN_WHILE, "expected 'while' keyword", "add 'while' keyword");
+  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
 
   ASTNode* condition = parse_expression(parser);
   if (!condition) return NULL;
 
-  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
-    synchronize(parser);
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_SEMICOLON)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'do'", "add ';' after 'do'");
-    synchronize(parser);
-    return NULL;
-  }
+  expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
+  expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'do'", "add ';' after 'do'");
 
   ASTNode* node = create_ast_node(parser, AST_DO_WHILE_STATEMENT);
   if (!node) return NULL;
@@ -490,23 +459,13 @@ static ASTNode* parse_do_while_statement(Parser* parser) {
 }
 
 static ASTNode* parse_while_statement(Parser* parser) {
-  if (!match_token(parser, TOKEN_WHILE)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'while'", "add 'while' keyword");
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
-    return NULL;
-  }
+  expect_token(TOKEN_WHILE, "expected 'while' keyword", "add 'while' keyword");
+  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
 
   ASTNode* condition = parse_expression(parser);
   if (!condition) return NULL;
 
-  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
-    return NULL;
-  }
+  expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
 
   ASTNode* body = parse_statement(parser);
   if (!body) return NULL;
@@ -520,20 +479,27 @@ static ASTNode* parse_while_statement(Parser* parser) {
   return node;
 }
 
+static ASTNode* parse_for_statement(Parser* parser) {
+  if (!match_token(parser, TOKEN_FOR)) {
+    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'for'", "add 'for' keyword");
+    return NULL;
+  }
+
+  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
+    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'for'", "add '('");
+    return NULL;
+  }
+
+  return NULL;
+}
+
 static ASTNode* parse_break_statement(Parser* parser) {
   // Capture the position of the break token before consuming it
   int line = parser->current_token.line;
   int column = parser->current_token.column;
 
-  if (!match_token(parser, TOKEN_BREAK)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'break'", "add 'break' keyword");
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_SEMICOLON)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'break'", "add ';'");
-    return NULL;
-  }
+  expect_token(TOKEN_BREAK, "expected 'break' keyword", "add 'break' keyword");
+  expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'break'", "add ';'");
 
   ASTNode* node = create_ast_node(parser, AST_BREAK_STATEMENT);
   if (!node) return NULL;
@@ -550,15 +516,8 @@ static ASTNode* parse_continue_statement(Parser* parser) {
   int line = parser->current_token.line;
   int column = parser->current_token.column;
 
-  if (!match_token(parser, TOKEN_CONTINUE)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'continue'", "add 'continue' keyword");
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_SEMICOLON)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'continue'", "add ';'");
-    return NULL;
-  }
+  expect_token(TOKEN_CONTINUE, "expected 'continue' keyword", "add 'continue' keyword");
+  expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'continue'", "add ';'");
 
   ASTNode* node = create_ast_node(parser, AST_CONTINUE_STATEMENT);
   if (!node) return NULL;
@@ -571,10 +530,7 @@ static ASTNode* parse_continue_statement(Parser* parser) {
 }
 
 static ASTNode* parse_compound_statement(Parser* parser) {
-  if (!match_token(parser, TOKEN_OPEN_BRACE)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
-    return NULL;
-  }
+  expect(TOKEN_OPEN_BRACE, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
 
   ASTNode* node = create_ast_node(parser, AST_COMPOUND_STATEMENT);
   if (!node) return NULL;
@@ -604,10 +560,7 @@ static ASTNode* parse_compound_statement(Parser* parser) {
     }
   }
 
-  if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
-    return NULL;
-  }
+  expect(TOKEN_CLOSE_BRACE, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
 
   return node;
 }
@@ -655,11 +608,7 @@ static ASTNode* parse_statement(Parser* parser) {
       return NULL;
     }
 
-    if (!match_token(parser, TOKEN_SEMICOLON)) {
-      report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';'", "add a semicolon");
-      synchronize(parser);
-      return NULL;
-    }
+    expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';'", "add a semicolon");
 
     return node;
   }
@@ -695,11 +644,7 @@ static ASTNode* parse_statement(Parser* parser) {
 }
 
 static ASTNode* parse_function(Parser* parser) {
-  if (!match_token(parser, TOKEN_INT)) {
-    report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected 'int'", "add 'int' keyword");
-    synchronize(parser);
-    return NULL;
-  }
+  expect_token(TOKEN_INT, "expected 'int'", "add 'int' keyword");
 
   if (parser->current_token.type != TOKEN_IDENTIFIER) {
     report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected function name", "add a function name");
@@ -720,23 +665,9 @@ static ASTNode* parse_function(Parser* parser) {
 
   advance_token(parser);
 
-  if (!match_token(parser, TOKEN_OPEN_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected '('", "add opening parenthesis");
-    synchronize(parser);
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
-    synchronize(parser);
-    return NULL;
-  }
-
-  if (!match_token(parser, TOKEN_OPEN_BRACE)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
-    synchronize(parser);
-    return NULL;
-  }
+  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '('", "add opening parenthesis");
+  expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
+  expect(TOKEN_OPEN_BRACE, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
 
   // Parse statements
   node->data.function.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
@@ -756,11 +687,7 @@ static ASTNode* parse_function(Parser* parser) {
     }
   }
 
-  if (!match_token(parser, TOKEN_CLOSE_BRACE)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
-    synchronize(parser);
-    return NULL;
-  }
+  expect(TOKEN_CLOSE_BRACE, ERROR_SYNTAX_MISSING_BRACE, "expected '}'", "add closing brace");
 
   return node;
 }
