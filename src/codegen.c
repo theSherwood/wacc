@@ -185,7 +185,7 @@ static void emit_export_section(Buffer* buf, Arena* arena) {
 
 // Context for tracking if nesting depth during code generation
 typedef struct CodegenContext {
-  int if_depth;  // Current nesting depth within if statements
+  int br_depth;  // Current nesting depth within if statements
 } CodegenContext;
 
 static void emit_region(Buffer* buf, Arena* arena, Region* region, CodegenContext* ctx);
@@ -319,17 +319,17 @@ static void emit_instruction(Buffer* buf, Arena* arena, Instruction* inst, Codeg
       break;
     }
     case IR_BREAK: {
-      // For break statements, branch index = number of if statements + 1
+      // For break statements, branch index = number of if statements + 2
       // This accounts for if statements between the break and the loop's outer block
-      int break_depth = ctx->if_depth + 1;
+      int break_depth = ctx->br_depth + 2;
       buffer_write_byte(buf, arena, WASM_BR);
       buffer_write_leb128_u32(buf, arena, break_depth);
       break;
     }
     case IR_CONTINUE: {
       // For continue statements, branch index = number of if statements
-      // This accounts for if statements between the break and the loop's outer block
-      int continue_depth = ctx->if_depth;
+      // This accounts for if statements between the break and the loop's inner block
+      int continue_depth = ctx->br_depth;
       buffer_write_byte(buf, arena, WASM_BR);
       buffer_write_leb128_u32(buf, arena, continue_depth);
       break;
@@ -365,17 +365,17 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region, CodegenContex
 
     // Emit then branch with increased if depth
     if (region->data.if_data.then_region) {
-      ctx->if_depth++;
+      ctx->br_depth++;
       emit_region(buf, arena, region->data.if_data.then_region, ctx);
-      ctx->if_depth--;
+      ctx->br_depth--;
     }
 
     // Emit else branch if present with increased if depth
     if (region->data.if_data.else_region) {
       buffer_write_byte(buf, arena, WASM_ELSE);
-      ctx->if_depth++;
+      ctx->br_depth++;
       emit_region(buf, arena, region->data.if_data.else_region, ctx);
-      ctx->if_depth--;
+      ctx->br_depth--;
     }
 
     // End the if
@@ -386,50 +386,68 @@ static void emit_region(Buffer* buf, Arena* arena, Region* region, CodegenContex
     buffer_write_byte(buf, arena, WASM_BLOCK);
     buffer_write_byte(buf, arena, 0x40);  // void block
 
-    // Loop for continue (inner loop)
-    buffer_write_byte(buf, arena, WASM_LOOP);
-    buffer_write_byte(buf, arena, 0x40);  // void loop
+    {
+      // Loop for continue (inner loop)
+      buffer_write_byte(buf, arena, WASM_LOOP);
+      buffer_write_byte(buf, arena, 0x40);  // void loop
 
-    if (region->data.loop_data.is_do_while) {
-      // Emit body
-      if (region->data.loop_data.body) {
-        CodegenContext new_ctx = {0};  // Initialize if_depth to 0
-        emit_region(buf, arena, region->data.loop_data.body, &new_ctx);
+      {
+        // Block for facilitating `continue` with exit regions (inner block)
+        buffer_write_byte(buf, arena, WASM_BLOCK);
+        buffer_write_byte(buf, arena, 0x40);  // void block
+
+        if (region->data.loop_data.start_condition) {
+          // Emit condition expression
+          CodegenContext new_ctx = {0};
+          emit_region(buf, arena, region->data.loop_data.start_condition, &new_ctx);
+
+          // Logical not condition (break if false)
+          buffer_write_byte(buf, arena, WASM_I32_EQZ);
+
+          // Break out of outer block if condition is false
+          buffer_write_byte(buf, arena, WASM_BR_IF);
+          buffer_write_byte(buf, arena, 2);  // depth 2 (outer block)
+        }
+
+        if (region->data.loop_data.body) {
+          CodegenContext new_ctx = {0};  // Initialize br_depth to 0
+          emit_region(buf, arena, region->data.loop_data.body, &new_ctx);
+        }
+
+        // End inner block
+        buffer_write_byte(buf, arena, WASM_END);
       }
+
+      if (region->data.loop_data.exit) {
+        // Emit condition expression
+        CodegenContext new_ctx = {0};
+        emit_region(buf, arena, region->data.loop_data.exit, &new_ctx);
+
+        // In a do-while loop, the exit region is a condition that can break
+        if (region->data.loop_data.loop_type == LOOP_DO_WHILE) {
+          // Logical not condition (break if false)
+          buffer_write_byte(buf, arena, WASM_I32_EQZ);
+
+          // Break out of outer block if condition is false
+          buffer_write_byte(buf, arena, WASM_BR_IF);
+          buffer_write_byte(buf, arena, 1);  // depth 1 (outer block)
+        }
+      }
+
+      // Continue loop (branch back to loop start)
+      buffer_write_byte(buf, arena, WASM_BR);
+      buffer_write_byte(buf, arena, 0);  // depth 0 (inner loop)
+
+      // End loop
+      buffer_write_byte(buf, arena, WASM_END);
     }
 
-    // Emit condition expression
-    CodegenContext new_ctx = {0};
-    emit_region(buf, arena, region->data.loop_data.condition, &new_ctx);
-
-    // Logical not condition (break if false)
-    buffer_write_byte(buf, arena, WASM_I32_EQZ);
-
-    // Break out of outer block if condition is false
-    buffer_write_byte(buf, arena, WASM_BR_IF);
-    buffer_write_byte(buf, arena, 1);  // depth 1 (outer block)
-
-    if (!region->data.loop_data.is_do_while) {
-      // Emit body
-      if (region->data.loop_data.body) {
-        CodegenContext new_ctx = {0};  // Initialize if_depth to 0
-        emit_region(buf, arena, region->data.loop_data.body, &new_ctx);
-      }
-    }
-
-    // Continue loop (branch back to loop start)
-    buffer_write_byte(buf, arena, WASM_BR);
-    buffer_write_byte(buf, arena, 0);  // depth 0 (inner loop)
-
-    // End loop
-    buffer_write_byte(buf, arena, WASM_END);
-
-    // End block
+    // End outer block
     buffer_write_byte(buf, arena, WASM_END);
   } else if (region->type == REGION_FUNCTION) {
     // Emit child regions first (control flow statements)
     for (size_t i = 0; i < region->child_count; i++) {
-      CodegenContext new_ctx = {0};  // Initialize if_depth to 0
+      CodegenContext new_ctx = {0};  // Initialize br_depth to 0
       emit_region(buf, arena, region->children[i], &new_ctx);
     }
 
@@ -476,7 +494,7 @@ static void emit_code_section(Buffer* buf, Arena* arena, IRModule* ir_module) {
 
     // Generate instructions from structured regions
     if (func->body) {
-      CodegenContext ctx = {0};  // Initialize if_depth to 0
+      CodegenContext ctx = {0};  // Initialize br_depth to 0
       emit_region(&func_body, arena, func->body, &ctx);
     }
 

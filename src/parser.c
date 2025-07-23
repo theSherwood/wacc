@@ -459,8 +459,8 @@ static ASTNode* parse_do_while_statement(Parser* parser) {
   ASTNode* node = create_ast_node(parser, AST_DO_WHILE_STATEMENT);
   if (!node) return NULL;
 
-  node->data.while_statement.body = body;
-  node->data.while_statement.condition = condition;
+  node->data.loop_statement.body = body;
+  node->data.loop_statement.condition = condition;
 
   return node;
 }
@@ -480,8 +480,8 @@ static ASTNode* parse_while_statement(Parser* parser) {
   ASTNode* node = create_ast_node(parser, AST_WHILE_STATEMENT);
   if (!node) return NULL;
 
-  node->data.while_statement.condition = condition;
-  node->data.while_statement.body = body;
+  node->data.loop_statement.condition = condition;
+  node->data.loop_statement.body = body;
 
   return node;
 }
@@ -493,7 +493,7 @@ static ASTNode* parse_for_statement(Parser* parser) {
   ASTNode* init_statement = parse_statement(parser);
   expect_node(init_statement, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add statement");
 
-  ASTNode* condition;
+  ASTNode* condition = NULL;
   if (!match_token(parser, TOKEN_SEMICOLON)) {
     condition = parse_expression(parser);
     expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add condition expression");
@@ -503,7 +503,7 @@ static ASTNode* parse_for_statement(Parser* parser) {
     condition->data.integer_constant.value = 1;
   }
 
-  ASTNode* increment;
+  ASTNode* increment = NULL;
   if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
     increment = parse_expression(parser);
     expect_node(increment, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add increment expression");
@@ -516,10 +516,10 @@ static ASTNode* parse_for_statement(Parser* parser) {
   ASTNode* node = create_ast_node(parser, AST_FOR_STATEMENT);
   if (!node) return NULL;
 
-  node->data.for_statement.init_statement = init_statement;
-  node->data.for_statement.condition = condition;
-  node->data.for_statement.increment = increment;
-  node->data.for_statement.body = body;
+  node->data.loop_statement.init_statement = init_statement;
+  node->data.loop_statement.condition = condition;
+  node->data.loop_statement.increment = increment;
+  node->data.loop_statement.body = body;
 
   return node;
 }
@@ -873,40 +873,54 @@ static void ast_print_node(ASTNode* node, int depth) {
       printf("Do While Statement\n");
       ast_print_indent(depth + 1);
       printf("Body:\n");
-      ast_print_node(node->data.while_statement.body, depth + 2);
+      ast_print_node(node->data.loop_statement.body, depth + 2);
       ast_print_indent(depth + 1);
       printf("Condition:\n");
-      ast_print_node(node->data.while_statement.condition, depth + 2);
+      ast_print_node(node->data.loop_statement.condition, depth + 2);
       break;
 
     case AST_WHILE_STATEMENT:
       printf("While Statement\n");
       ast_print_indent(depth + 1);
       printf("Condition:\n");
-      ast_print_node(node->data.while_statement.condition, depth + 2);
+      ast_print_node(node->data.loop_statement.condition, depth + 2);
       ast_print_indent(depth + 1);
       printf("Body:\n");
-      ast_print_node(node->data.while_statement.body, depth + 2);
+      ast_print_node(node->data.loop_statement.body, depth + 2);
       break;
 
     case AST_FOR_STATEMENT:
       printf("For Statement\n");
+      if (node->data.loop_statement.init_statement) {
+        ast_print_indent(depth + 1);
+        printf("Init Statement:\n");
+        ast_print_node(node->data.loop_statement.init_statement, depth + 2);
+      }
       ast_print_indent(depth + 1);
-      printf("Init Statement:\n");
-      ast_print_node(node->data.for_statement.init_statement, depth + 2);
-      ast_print_indent(depth + 1);
-      printf("Condition:\n");
-      ast_print_node(node->data.for_statement.condition, depth + 2);
-      ast_print_indent(depth + 1);
-      printf("Increment:\n");
-      ast_print_node(node->data.for_statement.increment, depth + 2);
-      ast_print_indent(depth + 1);
-      printf("Body:\n");
-      ast_print_node(node->data.for_statement.body, depth + 2);
+      printf("block:\n");
+      {
+        if (node->data.loop_statement.condition) {
+          ast_print_indent(depth + 2);
+          printf("Condition:\n");
+          ast_print_node(node->data.loop_statement.condition, depth + 3);
+        }
+        ast_print_indent(depth + 2);
+        printf("Body:\n");
+        ast_print_node(node->data.loop_statement.body, depth + 3);
+      }
+      if (node->data.loop_statement.increment) {
+        ast_print_indent(depth + 1);
+        printf("Increment:\n");
+        ast_print_node(node->data.loop_statement.increment, depth + 2);
+      }
       break;
 
     case AST_BREAK_STATEMENT:
       printf("Break Statement\n");
+      break;
+
+    case AST_CONTINUE_STATEMENT:
+      printf("Continue Statement\n");
       break;
 
     case AST_COMPOUND_STATEMENT:

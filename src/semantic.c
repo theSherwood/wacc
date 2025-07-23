@@ -278,7 +278,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       bool success = true;
 
       // Analyze the condition
-      if (!analyze_expression(ctx, &stmt->data.while_statement.condition)) {
+      if (!analyze_expression(ctx, &stmt->data.loop_statement.condition)) {
         success = false;
       }
 
@@ -286,7 +286,7 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       bool previous_in_loop = ctx->in_loop;
       ctx->in_loop = true;
 
-      if (!analyze_statement(ctx, stmt->data.while_statement.body)) {
+      if (!analyze_statement(ctx, stmt->data.loop_statement.body)) {
         success = false;
       }
 

@@ -216,15 +216,11 @@ typedef struct ASTNode {
       struct ASTNode* else_statement;  // Can be NULL
     } if_statement;
     struct {
-      struct ASTNode* condition;
-      struct ASTNode* body;
-    } while_statement;
-    struct {
       struct ASTNode* init_statement;
+      struct ASTNode* body;
       struct ASTNode* condition;
       struct ASTNode* increment;
-      struct ASTNode* body;
-    } for_statement;
+    } loop_statement;
     struct {
       struct ASTNode* condition;
       struct ASTNode* true_expression;
@@ -427,6 +423,12 @@ typedef enum {
   REGION_FUNCTION  // Function body
 } RegionType;
 
+typedef enum {
+  LOOP_WHILE,
+  LOOP_DO_WHILE,
+  LOOP_FOR,
+} LoopType;
+
 struct Region {
   RegionType type;
   TypeKind kind;
@@ -447,9 +449,10 @@ struct Region {
       struct Region* else_region;
     } if_data;
     struct {
-      bool is_do_while;  // True if this is a do-while loop
-      struct Region* condition;
+      LoopType loop_type;
+      struct Region* start_condition;
       struct Region* body;
+      struct Region* exit;
     } loop_data;
   } data;
 };

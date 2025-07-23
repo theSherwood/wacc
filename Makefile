@@ -15,13 +15,17 @@ clean:
 test:
 	./scripts/test_all.sh
 
+test_invalid:
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
+	./scripts/test_invalid.sh
+
 test_runtime:
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
 	./scripts/test_runtime.sh
 
-test_invalid:
+test_runtime_sequential:
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
-	./scripts/test_invalid.sh
+	./scripts/test_runtime_sequential.sh
 
 run:
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)

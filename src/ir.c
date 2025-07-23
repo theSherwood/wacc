@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "compiler.h"
 
@@ -353,26 +354,6 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
       break;
     }
 
-    case AST_ASSIGNMENT: {
-      // Generate the assignment expression
-      ir_generate_expression(ctx, stmt);
-
-      // Pop the result (we don't need it for statement context)
-      emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
-
-      break;
-    }
-
-    case AST_BINARY_OP: {
-      // Generate the binary operation expression
-      ir_generate_expression(ctx, stmt);
-
-      // Pop the result (we don't need it for statement context)
-      emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
-
-      break;
-    }
-
     case AST_IF_STATEMENT: {
       // Create IF region
       Region* if_region = region_create(ctx->arena, REGION_IF, ctx->next_region_id++, ctx->current_region);
@@ -407,56 +388,55 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
       break;
     }
 
+    case AST_FOR_STATEMENT:
     case AST_DO_WHILE_STATEMENT:
     case AST_WHILE_STATEMENT: {
-      // Create LOOP region for the while statement
-      Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
-      if (stmt->type == AST_DO_WHILE_STATEMENT) loop_region->data.loop_data.is_do_while = true;
-
-      // Generate condition expression and body in the loop region
-      Region* condition_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
-      loop_region->data.loop_data.condition = condition_region;
-      ctx->current_region = condition_region;
-      ir_generate_expression(ctx, stmt->data.while_statement.condition);
-
-      // Create body region
-      Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
-      loop_region->data.loop_data.body = body_region;
-      ctx->current_region = body_region;
-      ir_generate_statement(ctx, stmt->data.while_statement.body);
-
-      ctx->current_region = loop_region->parent;
-
-      emit_region_instruction(ctx, loop_region, create_void_type);
-
-      break;
-    }
-
-    case AST_FOR_STATEMENT: {
-      if (stmt->data.for_statement.init_statement) {
-        ir_generate_statement(ctx, stmt->data.for_statement.init_statement);
+      if (stmt->type == AST_FOR_STATEMENT && stmt->data.loop_statement.init_statement) {
+        ir_generate_statement(ctx, stmt->data.loop_statement.init_statement);
       }
 
       Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
 
-      // Generate condition expression and body in the loop region
       Region* condition_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
-      loop_region->data.loop_data.condition = condition_region;
       ctx->current_region = condition_region;
-      ir_generate_expression(ctx, stmt->data.for_statement.condition);
+      ir_generate_expression(ctx, stmt->data.loop_statement.condition);
 
-      // Create body region
       Region* body_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
-      loop_region->data.loop_data.body = body_region;
       ctx->current_region = body_region;
-      ir_generate_statement(ctx, stmt->data.for_statement.body);
+      ir_generate_statement(ctx, stmt->data.loop_statement.body);
 
-      if (stmt->data.for_statement.increment) {
-        ir_generate_expression(ctx, stmt->data.for_statement.increment);
+      Region* increment_region = NULL;
+      if (stmt->type == AST_FOR_STATEMENT && stmt->data.loop_statement.increment) {
+        increment_region = region_create(ctx->arena, REGION_BLOCK, ctx->next_region_id++, loop_region);
+        ctx->current_region = increment_region;
+        ir_generate_statement(ctx, stmt->data.loop_statement.increment);
+      }
+
+      switch (stmt->type) {
+        case AST_WHILE_STATEMENT:
+          loop_region->data.loop_data.loop_type = LOOP_WHILE;
+          loop_region->data.loop_data.start_condition = condition_region;
+          loop_region->data.loop_data.body = body_region;
+          loop_region->data.loop_data.exit = NULL;
+          break;
+        case AST_DO_WHILE_STATEMENT:
+          loop_region->data.loop_data.loop_type = LOOP_DO_WHILE;
+          loop_region->data.loop_data.start_condition = NULL;
+          loop_region->data.loop_data.body = body_region;
+          loop_region->data.loop_data.exit = condition_region;
+          break;
+        case AST_FOR_STATEMENT:
+          loop_region->data.loop_data.loop_type = LOOP_FOR;
+          loop_region->data.loop_data.start_condition = condition_region;
+          loop_region->data.loop_data.body = body_region;
+          loop_region->data.loop_data.exit = increment_region;
+          break;
+        default:
+          printf("UNREACHABLE");
+          exit(1);
       }
 
       ctx->current_region = loop_region->parent;
-
       emit_region_instruction(ctx, loop_region, create_void_type);
 
       break;
@@ -495,6 +475,9 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
 
     default:
       ir_generate_expression(ctx, stmt);
+
+      // Pop the result (we don't need it for statement context)
+      emit_instruction(ctx, IR_POP, create_i32_type(), NULL, 0);
 
       break;
   }
@@ -595,7 +578,9 @@ static const char* ir_opcode_to_string(IROpcode opcode) {
     case IR_RETURN:
       return "return";
     case IR_BREAK:
-      return "br";
+      return "break";
+    case IR_CONTINUE:
+      return "continue";
     case IR_POP:
       return "drop";
     case IR_DUP:
@@ -679,18 +664,26 @@ static void ir_print_region(Region* region, int indent) {
       ir_print_instructions(region, indent);
       break;
     case REGION_LOOP: {
-      if (region->data.loop_data.is_do_while) {
+      if (region->data.loop_data.loop_type == LOOP_DO_WHILE) {
         printf("loop (do-while):\n");
         print_indent(indent + 1);
         ir_print_region(region->data.loop_data.body, indent + 1);
         print_indent(indent + 1);
-        ir_print_region(region->data.loop_data.condition, indent + 1);
-      } else {
-        printf("loop:\n");
+        ir_print_region(region->data.loop_data.exit, indent + 1);
+      } else if (region->data.loop_data.loop_type == LOOP_WHILE) {
+        printf("loop (while):\n");
         print_indent(indent + 1);
-        ir_print_region(region->data.loop_data.condition, indent + 1);
+        ir_print_region(region->data.loop_data.start_condition, indent + 1);
         print_indent(indent + 1);
         ir_print_region(region->data.loop_data.body, indent + 1);
+      } else if (region->data.loop_data.loop_type == LOOP_FOR) {
+        printf("loop (for):\n");
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.start_condition, indent + 1);
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.body, indent + 1);
+        print_indent(indent + 1);
+        ir_print_region(region->data.loop_data.exit, indent + 1);
       }
       break;
     }
