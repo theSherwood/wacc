@@ -511,7 +511,7 @@ static ASTNode* parse_for_statement(Parser* parser) {
   }
 
   ASTNode* body = parse_statement(parser);
-  expect_node(body, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add statement");
+  expect_node(body, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add 'for' body statement");
 
   ASTNode* node = create_ast_node(parser, AST_FOR_STATEMENT);
   if (!node) return NULL;
@@ -598,7 +598,8 @@ static ASTNode* parse_compound_statement(Parser* parser) {
 
 static ASTNode* parse_statement(Parser* parser) {
   if (parser->current_token.type == TOKEN_SEMICOLON) {
-    return NULL;
+    advance_token(parser);
+    return create_ast_node(parser, AST_EMPTY_STATEMENT);
   }
 
   if (parser->current_token.type == TOKEN_INT) {
@@ -928,6 +929,10 @@ static void ast_print_node(ASTNode* node, int depth) {
       for (int i = 0; i < node->data.compound_statement.statement_count; i++) {
         ast_print_node(node->data.compound_statement.statements[i], depth + 1);
       }
+      break;
+
+    case AST_EMPTY_STATEMENT:
+      printf("Empty Statement\n");
       break;
 
     default:

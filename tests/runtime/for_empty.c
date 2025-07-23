@@ -8,3 +8,4 @@ int main() {
 
     return a;
 }
+// Expected: 4

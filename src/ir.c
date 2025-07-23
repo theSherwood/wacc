@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "compiler.h"
 
@@ -320,6 +319,10 @@ static void ir_generate_expression(IRContext* ctx, ASTNode* expr) {
 // Statement generation
 static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
   switch (stmt->type) {
+    case AST_EMPTY_STATEMENT: {
+      break;
+    }
+
     case AST_RETURN_STATEMENT: {
       // Generate the return expression (pushes value to stack)
       ir_generate_expression(ctx, stmt->data.return_statement.expression);
@@ -391,8 +394,15 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
     case AST_FOR_STATEMENT:
     case AST_DO_WHILE_STATEMENT:
     case AST_WHILE_STATEMENT: {
-      if (stmt->type == AST_FOR_STATEMENT && stmt->data.loop_statement.init_statement) {
-        ir_generate_statement(ctx, stmt->data.loop_statement.init_statement);
+      // Create a new scope for the compound statement
+      SymbolTable* previous_scope = ctx->current_scope;
+
+      if (stmt->type == AST_FOR_STATEMENT) {
+        ctx->current_scope = symbol_table_create(ctx->arena, previous_scope);
+
+        if (stmt->data.loop_statement.init_statement) {
+          ir_generate_statement(ctx, stmt->data.loop_statement.init_statement);
+        }
       }
 
       Region* loop_region = region_create(ctx->arena, REGION_LOOP, ctx->next_region_id++, ctx->current_region);
@@ -436,6 +446,7 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
           exit(1);
       }
 
+      ctx->current_scope = previous_scope;
       ctx->current_region = loop_region->parent;
       emit_region_instruction(ctx, loop_region, create_void_type);
 
@@ -456,11 +467,6 @@ static void ir_generate_statement(IRContext* ctx, ASTNode* stmt) {
       // Create a new scope for the compound statement
       SymbolTable* previous_scope = ctx->current_scope;
       ctx->current_scope = symbol_table_create(ctx->arena, previous_scope);
-
-      if (!ctx->current_scope) {
-        ctx->current_scope = previous_scope;
-        return;
-      }
 
       // Generate IR for all statements in the compound statement
       for (int i = 0; i < stmt->data.compound_statement.statement_count; i++) {

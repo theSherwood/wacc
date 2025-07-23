@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // Error handling system
 typedef struct {
@@ -168,7 +169,8 @@ typedef enum {
   AST_BREAK_STATEMENT,
   AST_CONTINUE_STATEMENT,
   AST_TERNARY_EXPRESSION,
-  AST_COMPOUND_STATEMENT
+  AST_COMPOUND_STATEMENT,
+  AST_EMPTY_STATEMENT
 } ASTNodeType;
 
 typedef struct ASTNode {

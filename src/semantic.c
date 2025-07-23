@@ -213,11 +213,6 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       SymbolTable* previous_scope = ctx->current_scope;
       ctx->current_scope = symbol_table_create(ctx->arena, previous_scope);
 
-      if (!ctx->current_scope) {
-        ctx->current_scope = previous_scope;
-        return false;
-      }
-
       bool success = true;
 
       // Analyze all statements in the compound statement
@@ -296,6 +291,46 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
       return success;
     }
 
+    case AST_FOR_STATEMENT: {
+      // Create a new scope for the compound statement
+      SymbolTable* previous_scope = ctx->current_scope;
+      ctx->current_scope = symbol_table_create(ctx->arena, previous_scope);
+
+      bool success = true;
+
+      // Analyze the init_statement
+      if (stmt->data.loop_statement.init_statement &&
+          !analyze_statement(ctx, stmt->data.loop_statement.init_statement)) {
+        success = false;
+      }
+
+      // Analyze the condition
+      if (stmt->data.loop_statement.condition && !analyze_expression(ctx, &stmt->data.loop_statement.condition)) {
+        success = false;
+      }
+
+      // Set loop context and analyze the body
+      bool previous_in_loop = ctx->in_loop;
+      ctx->in_loop = true;
+
+      if (!analyze_statement(ctx, stmt->data.loop_statement.body)) {
+        success = false;
+      }
+
+      // Restore previous loop context
+      ctx->in_loop = previous_in_loop;
+
+      // Analyze the increment expression
+      if (stmt->data.loop_statement.increment && !analyze_expression(ctx, &stmt->data.loop_statement.increment)) {
+        success = false;
+      }
+
+      // Restore the previous scope
+      ctx->current_scope = previous_scope;
+
+      return success;
+    }
+
     case AST_BREAK_STATEMENT: {
       // Check if we're inside a loop
       if (!ctx->in_loop) {
@@ -317,6 +352,9 @@ static bool analyze_statement(SemanticContext* ctx, ASTNode* stmt) {
 
       return true;
     }
+
+    case AST_EMPTY_STATEMENT:
+      return true;
 
     default:
       // Other statement types (like expression statements)
