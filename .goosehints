@@ -1,19 +1,45 @@
-Refer to ./IMPLEMENTATION_PLAN.md for the implementation plan.
+We are building a compiler for a subset of C99 to WASM. We are implementing the compiler in C99.
 
-Use ./IMPLEMENTATION_STATUS.md to understand the current project status. Keep it up to date when you make changes.
+Refer to @IMPLEMENTATION_PLAN.md for the implementation plan.
 
-Refer to ./IR_OUTLINE.md when changing the intermediate representation.
-
-Tests should be added to the `tests` directory.
+Tests should be added to the `tests` directory. Tests in `tests/invalid` are for code that should fail to compile. Tests in `tests/runtime` should compile and be run.
 
 Don't attempt anything more than 3 times. If you can't succeed after 3 attempts, let me know so I can help.
+
+# Directory Structure
+
+- scripts/
+  - ...
+- src/
+  - compiler.h
+  - main.c
+  - lexer.c
+  - parser.c
+  - semantic.c
+  - ir.c
+  - codegen.c
+  - arena.c
+  - error.c
+  - utils.c
+- tests/
+  - invalid/
+    - ...
+  - runtime/
+    - ...
 
 # Build Commands
 
 - `make` - Build the compiler
 - `make clean` - Clean build artifacts
-- `make test` - Run the tests
+- `make test` - Run all tests
+- `make test_runtime` - Run the runtime tests
+- `make test_invalid` - Run the invalid tests
+- `make F=<file.c> run` - Compiles a C file to WASM and runs it
+- `make F=<file.c> wat` - Prints the WAT for debugging
+- `make F=<file.c> ast` - Prints the AST for debugging
+- `make F=<file.c> ir` - Prints the IR for debugging
 - `./wacc <file.c>` - Compile a C file to WASM (outputs to out.wasm)
+- `./wacc <file.c> -o <output_path>` - Compile a C file to WASM (outputs to `<output_path>`)
 
 # When writing code
 
@@ -27,5 +53,4 @@ Don't attempt anything more than 3 times. If you can't succeed after 3 attempts,
 - Prefer snake_case for values and functions. Prefer PascalCase for types.
 - Use arenas for memory management.
 - Use data-oriented design for fast code with good cache locality.
-- Follow the philosophy of Mike Acton, Casey Muratori, and Ryan Fleury.
-- Avoid the standard library
+- Avoid the standard library.

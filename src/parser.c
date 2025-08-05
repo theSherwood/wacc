@@ -4,18 +4,22 @@
 
 #define MAX_STATEMENTS 256
 
+ASTNode* AST_ERROR = 0xffffffffffffffff;
+
 #define expect_node(node, error, message, suggestion) \
   if (!node) {                                        \
     report_error(parser, error, message, suggestion); \
     synchronize(parser);                              \
-    return NULL;                                      \
+    return AST_ERROR;                                 \
+  } else if (node == AST_ERROR) {                     \
+    return AST_ERROR;                                 \
   }
 
 #define expect(token, error, message, suggestion)     \
   if (!match_token(parser, token)) {                  \
     report_error(parser, error, message, suggestion); \
     synchronize(parser);                              \
-    return NULL;                                      \
+    return AST_ERROR;                                 \
   }
 
 #define expect_token(token, message, suggestion) expect(token, ERROR_SYNTAX_EXPECTED_TOKEN, message, suggestion)
@@ -138,7 +142,7 @@ static ASTNode* parse_primary(Parser* parser) {
   // Handle parentheses
   if (match_token(parser, TOKEN_OPEN_PAREN)) {
     ASTNode* expr = parse_expression(parser);
-    if (!expr) return NULL;
+    expect_node(expr, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')'", "add closing parenthesis");
 
@@ -146,10 +150,9 @@ static ASTNode* parse_primary(Parser* parser) {
   }
 
   // Error: expected primary expression
-  report_error(parser, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression",
-               "add an integer literal or parenthesized expression");
+  report_error(parser, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
   synchronize(parser);
-  return NULL;
+  return AST_ERROR;
 }
 
 static ASTNode* parse_unary(Parser* parser) {
@@ -160,10 +163,9 @@ static ASTNode* parse_unary(Parser* parser) {
     advance_token(parser);
 
     ASTNode* operand = parse_unary(parser);  // Right-associative
-    if (!operand) return NULL;
+    expect_node(operand, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_UNARY_OP);
-    if (!node) return NULL;
 
     node->data.unary_op.operator = op;
     node->data.unary_op.operand = operand;
@@ -184,10 +186,9 @@ static ASTNode* parse_multiplicative(Parser* parser) {
     advance_token(parser);
 
     ASTNode* right = parse_unary(parser);
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
-    if (!node) return NULL;
 
     node->data.binary_op.operator = op;
     node->data.binary_op.left = left;
@@ -201,17 +202,16 @@ static ASTNode* parse_multiplicative(Parser* parser) {
 
 static ASTNode* parse_additive(Parser* parser) {
   ASTNode* left = parse_multiplicative(parser);
-  if (!left) return NULL;
+  expect_node(left, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   while (parser->current_token.type == TOKEN_PLUS || parser->current_token.type == TOKEN_MINUS) {
     TokenType op = parser->current_token.type;
     advance_token(parser);
 
     ASTNode* right = parse_multiplicative(parser);
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
-    if (!node) return NULL;
 
     node->data.binary_op.operator = op;
     node->data.binary_op.left = left;
@@ -225,7 +225,7 @@ static ASTNode* parse_additive(Parser* parser) {
 
 static ASTNode* parse_relational(Parser* parser) {
   ASTNode* left = parse_additive(parser);
-  if (!left) return NULL;
+  expect_node(left, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   while (parser->current_token.type == TOKEN_LT || parser->current_token.type == TOKEN_GT ||
          parser->current_token.type == TOKEN_LT_EQ || parser->current_token.type == TOKEN_GT_EQ) {
@@ -233,10 +233,9 @@ static ASTNode* parse_relational(Parser* parser) {
     advance_token(parser);
 
     ASTNode* right = parse_additive(parser);
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
-    if (!node) return NULL;
 
     node->data.binary_op.operator = op;
     node->data.binary_op.left = left;
@@ -250,17 +249,16 @@ static ASTNode* parse_relational(Parser* parser) {
 
 static ASTNode* parse_equality(Parser* parser) {
   ASTNode* left = parse_relational(parser);
-  if (!left) return NULL;
+  expect_node(left, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   while (parser->current_token.type == TOKEN_EQ_EQ || parser->current_token.type == TOKEN_BANG_EQ) {
     TokenType op = parser->current_token.type;
     advance_token(parser);
 
     ASTNode* right = parse_relational(parser);
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
-    if (!node) return NULL;
 
     node->data.binary_op.operator = op;
     node->data.binary_op.left = left;
@@ -274,17 +272,16 @@ static ASTNode* parse_equality(Parser* parser) {
 
 static ASTNode* parse_logical_and(Parser* parser) {
   ASTNode* left = parse_equality(parser);
-  if (!left) return NULL;
+  expect_node(left, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   while (parser->current_token.type == TOKEN_AMP_AMP) {
     TokenType op = parser->current_token.type;
     advance_token(parser);
 
     ASTNode* right = parse_equality(parser);
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression after '... &&'", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
-    if (!node) return NULL;
 
     node->data.binary_op.operator = op;
     node->data.binary_op.left = left;
@@ -298,17 +295,16 @@ static ASTNode* parse_logical_and(Parser* parser) {
 
 static ASTNode* parse_logical_or(Parser* parser) {
   ASTNode* left = parse_logical_and(parser);
-  if (!left) return NULL;
+  expect_node(left, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   while (parser->current_token.type == TOKEN_PIPE_PIPE) {
     TokenType op = parser->current_token.type;
     advance_token(parser);
 
     ASTNode* right = parse_logical_and(parser);
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression after '... ||'", "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_BINARY_OP);
-    if (!node) return NULL;
 
     node->data.binary_op.operator = op;
     node->data.binary_op.left = left;
@@ -322,19 +318,20 @@ static ASTNode* parse_logical_or(Parser* parser) {
 
 static ASTNode* parse_ternary_expression(Parser* parser) {
   ASTNode* condition = parse_logical_or(parser);
-  if (!condition) return NULL;
+  expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   if (match_token(parser, TOKEN_QUESTION)) {
     ASTNode* true_expr = parse_expression(parser);
-    if (!true_expr) return NULL;
+    expect_node(true_expr, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression after '... ?'",
+                "expected expression");
 
     expect_token(TOKEN_COLON, "expected ':' in ternary expression", "add ':'");
 
     ASTNode* false_expr = parse_ternary_expression(parser);  // Right-associative
-    if (!false_expr) return NULL;
+    expect_node(false_expr, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression after '... ? ... :'",
+                "expected expression");
 
     ASTNode* node = create_ast_node(parser, AST_TERNARY_EXPRESSION);
-    if (!node) return NULL;
 
     node->data.ternary_expression.condition = condition;
     node->data.ternary_expression.true_expression = true_expr;
@@ -348,19 +345,19 @@ static ASTNode* parse_ternary_expression(Parser* parser) {
 
 static ASTNode* parse_assignment_expression(Parser* parser) {
   ASTNode* left = parse_ternary_expression(parser);
+  expect_node(left, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   if (match_token(parser, TOKEN_EQ)) {
     ASTNode* right = parse_assignment_expression(parser);  // Right-associative
-    if (!right) return NULL;
+    expect_node(right, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     // Check if the left side is a valid assignment target (l-value)
     if (left->type != AST_VARIABLE_REF) {
       report_error(parser, ERROR_SEM_INVALID_ASSIGNMENT, "invalid assignment target", "target must be a variable");
-      return NULL;
+      return AST_ERROR;
     }
 
     ASTNode* node = create_ast_node(parser, AST_ASSIGNMENT);
-    if (!node) return NULL;
 
     node->data.assignment.name = left->data.variable_ref.name;
     node->data.assignment.value = right;
@@ -379,16 +376,14 @@ static ASTNode* parse_declaration(Parser* parser) {
 
   if (parser->current_token.type != TOKEN_IDENTIFIER) {
     report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected identifier after type", "add a variable name");
-    return NULL;
+    return AST_ERROR;
   }
 
   ASTNode* node = create_ast_node(parser, AST_VARIABLE_DECL);
-  if (!node) return NULL;
 
   // Copy identifier name
   size_t name_len = parser->current_token.length;
   char* name = arena_alloc(parser->arena, name_len + 1);
-  if (!name) return NULL;
   str_ncpy(name, parser->current_token.start, name_len);
   name[name_len] = '\0';
   node->data.variable_decl.name = name;
@@ -399,7 +394,12 @@ static ASTNode* parse_declaration(Parser* parser) {
   if (match_token(parser, TOKEN_EQ)) {
     node->data.variable_decl.initializer = parse_expression(parser);
     // Error in parsing initializer
-    if (!node->data.variable_decl.initializer) return node;
+    if (!node->data.variable_decl.initializer) {
+      report_error(parser, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
+      synchronize(parser);
+      // Still return the declaration node so the variable gets registered
+      return node;
+    }
   } else {
     node->data.variable_decl.initializer = NULL;
   }
@@ -408,6 +408,7 @@ static ASTNode* parse_declaration(Parser* parser) {
     report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after declaration", "add a semicolon");
     synchronize(parser);
     // Still return the declaration node so the variable gets registered
+    return node;
   }
 
   return node;
@@ -415,24 +416,23 @@ static ASTNode* parse_declaration(Parser* parser) {
 
 static ASTNode* parse_if_statement(Parser* parser) {
   expect_token(TOKEN_IF, "expected 'if' keyword", "add 'if' keyword");
-  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('")
+  expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'if'", "add '('");
 
-      ASTNode* condition = parse_expression(parser);
-  if (!condition) return NULL;
+  ASTNode* condition = parse_expression(parser);
+  expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after if condition", "add ')'");
 
   ASTNode* then_statement = parse_statement(parser);
-  if (!then_statement) return NULL;
+  expect_node(then_statement, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "expected statement");
 
   ASTNode* else_statement = NULL;
   if (match_token(parser, TOKEN_ELSE)) {
     else_statement = parse_statement(parser);
-    if (!else_statement) return NULL;
+    expect_node(else_statement, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "expected statement");
   }
 
   ASTNode* node = create_ast_node(parser, AST_IF_STATEMENT);
-  if (!node) return NULL;
 
   node->data.if_statement.condition = condition;
   node->data.if_statement.then_statement = then_statement;
@@ -445,19 +445,18 @@ static ASTNode* parse_do_while_statement(Parser* parser) {
   expect_token(TOKEN_DO, "expected 'do' keyword", "add 'do' keyword");
 
   ASTNode* body = parse_statement(parser);
-  if (!body) return NULL;
+  expect_node(body, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "expected statement");
 
   expect_token(TOKEN_WHILE, "expected 'while' keyword", "add 'while' keyword");
   expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
 
   ASTNode* condition = parse_expression(parser);
-  if (!condition) return NULL;
+  expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
-  expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'do'", "add ';' after 'do'");
+  expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'do...while'", "add ';' after 'do'");
 
   ASTNode* node = create_ast_node(parser, AST_DO_WHILE_STATEMENT);
-  if (!node) return NULL;
 
   node->data.loop_statement.body = body;
   node->data.loop_statement.condition = condition;
@@ -470,15 +469,14 @@ static ASTNode* parse_while_statement(Parser* parser) {
   expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'while'", "add '('");
 
   ASTNode* condition = parse_expression(parser);
-  if (!condition) return NULL;
+  expect_node(condition, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
   expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after while condition", "add ')'");
 
   ASTNode* body = parse_statement(parser);
-  if (!body) return NULL;
+  expect_node(body, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "expected statement");
 
   ASTNode* node = create_ast_node(parser, AST_WHILE_STATEMENT);
-  if (!node) return NULL;
 
   node->data.loop_statement.condition = condition;
   node->data.loop_statement.body = body;
@@ -490,8 +488,10 @@ static ASTNode* parse_for_statement(Parser* parser) {
   expect_token(TOKEN_FOR, "expected 'for' keyword", "add 'for' keyword");
   expect(TOKEN_OPEN_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected '(' after 'for'", "add '('");
 
+  printf("line %d, column %d\n", parser->current_token.line, parser->current_token.column);
   ASTNode* init_statement = parse_statement(parser);
   expect_node(init_statement, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add statement");
+  printf("line %d, column %d\n", parser->current_token.line, parser->current_token.column);
 
   ASTNode* condition = NULL;
   if (!match_token(parser, TOKEN_SEMICOLON)) {
@@ -502,6 +502,7 @@ static ASTNode* parse_for_statement(Parser* parser) {
     condition = create_ast_node(parser, AST_INTEGER_CONSTANT);
     condition->data.integer_constant.value = 1;
   }
+  printf("line %d, column %d\n", parser->current_token.line, parser->current_token.column);
 
   ASTNode* increment = NULL;
   if (!match_token(parser, TOKEN_CLOSE_PAREN)) {
@@ -509,12 +510,12 @@ static ASTNode* parse_for_statement(Parser* parser) {
     expect_node(increment, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "add increment expression");
     expect(TOKEN_CLOSE_PAREN, ERROR_SYNTAX_MISSING_PAREN, "expected ')' after for loop", "add ')'");
   }
+  printf("line %d, column %d\n", parser->current_token.line, parser->current_token.column);
 
   ASTNode* body = parse_statement(parser);
   expect_node(body, ERROR_SYNTAX_EXPECTED_STATEMENT, "expected statement", "add 'for' body statement");
 
   ASTNode* node = create_ast_node(parser, AST_FOR_STATEMENT);
-  if (!node) return NULL;
 
   node->data.loop_statement.init_statement = init_statement;
   node->data.loop_statement.condition = condition;
@@ -533,7 +534,6 @@ static ASTNode* parse_break_statement(Parser* parser) {
   expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'break'", "add ';'");
 
   ASTNode* node = create_ast_node(parser, AST_BREAK_STATEMENT);
-  if (!node) return NULL;
 
   // Override the line and column to use the break token's position
   node->line = line;
@@ -551,7 +551,6 @@ static ASTNode* parse_continue_statement(Parser* parser) {
   expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after 'continue'", "add ';'");
 
   ASTNode* node = create_ast_node(parser, AST_CONTINUE_STATEMENT);
-  if (!node) return NULL;
 
   // Override the line and column to use the continue token's position
   node->line = line;
@@ -564,7 +563,6 @@ static ASTNode* parse_compound_statement(Parser* parser) {
   expect(TOKEN_OPEN_BRACE, ERROR_SYNTAX_MISSING_BRACE, "expected '{'", "add opening brace");
 
   ASTNode* node = create_ast_node(parser, AST_COMPOUND_STATEMENT);
-  if (!node) return NULL;
 
   // Allocate space for statements
   node->data.compound_statement.statements = arena_alloc(parser->arena, sizeof(ASTNode*) * MAX_STATEMENTS);
@@ -578,7 +576,7 @@ static ASTNode* parse_compound_statement(Parser* parser) {
       if (node->data.compound_statement.statement_count >= MAX_STATEMENTS) {
         report_error(parser, ERROR_SYNTAX_UNEXPECTED_TOKEN, "too many statements in block",
                      "reduce number of statements");
-        return NULL;
+        return AST_ERROR;
       }
       node->data.compound_statement.statements[node->data.compound_statement.statement_count++] = stmt;
     } else {
@@ -636,13 +634,10 @@ static ASTNode* parse_statement(Parser* parser) {
 
   if (match_token(parser, TOKEN_RETURN)) {
     ASTNode* node = create_ast_node(parser, AST_RETURN_STATEMENT);
-    if (!node) return NULL;
 
-    node->data.return_statement.expression = parse_expression(parser);
-    if (!node->data.return_statement.expression) {
-      // Error already reported by parse_expression
-      return NULL;
-    }
+    ASTNode* expression = parse_expression(parser);
+    node->data.return_statement.expression = expression;
+    expect_node(expression, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
 
     expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';'", "add a semicolon");
 
@@ -657,17 +652,13 @@ static ASTNode* parse_statement(Parser* parser) {
     // Skip the statement that follows the else
     parse_statement(parser);
 
-    return NULL;
+    return AST_ERROR;
   }
 
   // Fallback to expression statement (for assignments)
   ASTNode* expr = parse_expression(parser);
-  if (!expr) return NULL;
-
-  if (!match_token(parser, TOKEN_SEMICOLON)) {
-    report_error(parser, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';' after expression", "add a semicolon");
-    return NULL;
-  }
+  expect_node(expr, ERROR_SYNTAX_EXPECTED_EXPRESSION, "expected expression", "expected expression");
+  expect(TOKEN_SEMICOLON, ERROR_SYNTAX_MISSING_SEMICOLON, "expected ';'", "add a semicolon");
 
   return expr;
 }
@@ -678,16 +669,14 @@ static ASTNode* parse_function(Parser* parser) {
   if (parser->current_token.type != TOKEN_IDENTIFIER) {
     report_error(parser, ERROR_SYNTAX_EXPECTED_TOKEN, "expected function name", "add a function name");
     synchronize(parser);
-    return NULL;
+    return AST_ERROR;
   }
 
   ASTNode* node = create_ast_node(parser, AST_FUNCTION);
-  if (!node) return NULL;
 
   // Copy function name
   size_t name_len = parser->current_token.length;
   char* name = arena_alloc(parser->arena, name_len + 1);
-  if (!name) return NULL;
   str_ncpy(name, parser->current_token.start, name_len);
   name[name_len] = '\0';
   node->data.function.name = name;
@@ -723,7 +712,6 @@ static ASTNode* parse_function(Parser* parser) {
 
 ASTNode* parser_parse_program(Parser* parser) {
   ASTNode* node = create_ast_node(parser, AST_PROGRAM);
-  if (!node) return NULL;
 
   parser->ast = node;
 

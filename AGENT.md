@@ -2,10 +2,6 @@ We are building a compiler for a subset of C99 to WASM. We are implementing the 
 
 Refer to @IMPLEMENTATION_PLAN.md for the implementation plan.
 
-Use @IMPLEMENTATION_STATUS.md to understand the current project status. Keep it up to date when you make changes.
-
-Refer to @IR_OUTLINE.md when changing the intermediate representation.
-
 Tests should be added to the `tests` directory. Tests in `tests/invalid` are for code that should fail to compile. Tests in `tests/runtime` should compile and be run.
 
 Don't attempt anything more than 3 times. If you can't succeed after 3 attempts, let me know so I can help.
@@ -57,5 +53,4 @@ Don't attempt anything more than 3 times. If you can't succeed after 3 attempts,
 - Prefer snake_case for values and functions. Prefer PascalCase for types.
 - Use arenas for memory management.
 - Use data-oriented design for fast code with good cache locality.
-- Follow the philosophy of Mike Acton, Casey Muratori, and Ryan Fleury.
-- Avoid the standard library
+- Avoid the standard library.
